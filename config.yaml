@@ -1,0 +1,7 @@
+dim: 128
+depth: 4
+num_tokens: 20
+batch_size: 32
+learning_rate: 0.001
+num_epochs: 10
+data_path: 'your_data_path'
