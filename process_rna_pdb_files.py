@@ -62,8 +62,10 @@ def process_file(
     metadata = {}
     pdb_name = os.path.basename(file_path).replace(".pdb", "")
     metadata["pdb_name"] = pdb_name
-
-    pdb_subdir = os.path.join(write_dir, pdb_name[1:3].lower())
+    try :
+        pdb_subdir = os.path.join(write_dir, pdb_name[5:9].lower())
+    except : 
+        pdb_subdir = os.path.join(write_dir, pdb_name[0:4].lower())
     os.makedirs(pdb_subdir, exist_ok=True)
     processed_path = os.path.join(pdb_subdir, f"{pdb_name}.pkl")
     metadata["processed_path"] = os.path.abspath(processed_path)
@@ -324,3 +326,4 @@ if __name__ == "__main__":
     main(args)
 
     # python process_rna_pdb_files.py --pdb_dir data/rnasolo/ --write_dir data/
+    

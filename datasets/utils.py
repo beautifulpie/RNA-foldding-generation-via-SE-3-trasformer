@@ -11,8 +11,10 @@ import os
 from torch_scatter import scatter_add, scatter
 from Bio import PDB
 
-import protein_constants
-from datasets import protein_constants, nucleotide_constants, rigid_utils as ru
+import sys
+sys.path.append("/workspace/4D-Diff-RNA_test_1/datasets")
+
+import protein_constants, nucleotide_constants, rigid_utils as ru
 
 Rigid = ru.Rigid
 
