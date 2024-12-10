@@ -1,0 +1,3 @@
+pdb_name,processed_path,raw_path,num_chains,quaternary_category,num_protein_chains,num_na_chains,seq_len,na_seq_len,modeled_seq_len,modeled_protein_seq_len,modeled_na_seq_len,coil_percent,helix_percent,strand_percent,radius_gyration
+correct_data,/workspace/4D-Diff-RNA_test_1/data_test/or/correct_data.pkl,data_test/correct_data.pdb,1,homomer,0,1,1,1,1,0,1,0.0,0.0,0.0,0.2623007206294845
+incorrect_data,/workspace/4D-Diff-RNA_test_1/data_test/nc/incorrect_data.pkl,data_test/incorrect_data.pdb,1,homomer,0,1,2,2,2,0,2,0.0,0.0,0.0,0.39375993631581746

@@ -118,7 +118,6 @@ class DenoisingModel(nn.Module):
         self.node_embedder = node_embedder.NodeEmbedder(model_conf.node_features)
         self.edge_embedder = edge_embedder.EdgeEmbedder(model_conf.edge_features)
 
-
     def forward(self, seq, coord_4d):
         S = len(coord_4d)   # Length of Frame
         node_emb = self.node_embedder(seq)
@@ -156,3 +155,16 @@ class DenoisingModel(nn.Module):
         result_trajectory = backbone_trajectory
         
         return result_trajectory
+    
+    def _apply_mask(self, aatype_diff, aatype_0, diff_mask):
+        return diff_mask * aatype_diff + (1 - diff_mask) * aatype_0
+    
+    # Define model configuration and create instance
+model_conf = {
+    'node_features': 128,  # Example value
+    'edge_features': 64,  # Example value
+    # Add other necessary configuration parameters
+}
+
+# Create model instance
+model = DenoisingModel(model_conf)

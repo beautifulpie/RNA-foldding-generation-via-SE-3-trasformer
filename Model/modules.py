@@ -99,3 +99,34 @@ class BackboneUpdate(nn.Module):
 
 def Process_trajectory():
     return
+
+
+class SinusoidalTimeEmbedding(torch.nn.Module):
+    def __init__(self, embedding_dim):
+        super(SinusoidalTimeEmbedding, self).__init__()
+        self.embedding_dim = embedding_dim
+    
+    def forward(self, time_tensor):
+        """
+        Args:
+            time_tensor: Tensor of shape [seq_len, batch_size] or [batch_size, seq_len] containing time steps or time values
+        """
+        # Ensure time_tensor is [seq_len, batch_size]
+        if time_tensor.dim() == 2 and time_tensor.size(1) != self.embedding_dim:
+            time_tensor = time_tensor.transpose(0, 1)
+        
+        seq_len, batch_size = time_tensor.size()
+        
+        # Create a tensor to hold the time embeddings
+        time_emb = torch.zeros(seq_len, batch_size, self.embedding_dim, device=time_tensor.device)
+        
+        # Compute the scaling factors for the sine and cosine functions
+        div_term = torch.exp(torch.arange(0, self.embedding_dim, 2, device=time_tensor.device).float() * (-math.log(10000.0) / self.embedding_dim))
+        
+        # Apply sine to even indices
+        time_emb[:, :, 0::2] = torch.sin(time_tensor.unsqueeze(-1) * div_term)
+        
+        # Apply cosine to odd indices
+        time_emb[:, :, 1::2] = torch.cos(time_tensor.unsqueeze(-1) * div_term)
+        
+        return time_emb
