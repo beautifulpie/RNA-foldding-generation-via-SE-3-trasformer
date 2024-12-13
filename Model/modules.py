@@ -101,6 +101,9 @@ def Process_trajectory():
     return
 
 
+import torch
+import math
+
 class SinusoidalTimeEmbedding(torch.nn.Module):
     def __init__(self, embedding_dim):
         super(SinusoidalTimeEmbedding, self).__init__()
@@ -112,7 +115,7 @@ class SinusoidalTimeEmbedding(torch.nn.Module):
             time_tensor: Tensor of shape [seq_len, batch_size] or [batch_size, seq_len] containing time steps or time values
         """
         # Ensure time_tensor is [seq_len, batch_size]
-        if time_tensor.dim() == 2 and time_tensor.size(1) != self.embedding_dim:
+        if time_tensor.dim() == 2 and time_tensor.size(0) != self.embedding_dim:
             time_tensor = time_tensor.transpose(0, 1)
         
         seq_len, batch_size = time_tensor.size()

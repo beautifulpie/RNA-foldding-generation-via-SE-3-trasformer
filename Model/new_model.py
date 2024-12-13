@@ -16,9 +16,7 @@ import torch
 import torch.nn as nn
 import datasets.ipa_pytorch as ipa_pytorch
 import torsion_net
-from datasets import rigid_utils as du  # Assuming this is a custom utility module
-
-
+from datasets import utils as du  
 
 class FlowModel(nn.Module):
 
@@ -28,6 +26,7 @@ class FlowModel(nn.Module):
         self._ipa_conf = model_conf.ipa
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
+        self.num_iterations = 1
 
         self.node_embedder = node_embedder.NodeEmbedder(model_conf.node_features)
         self.edge_embedder = edge_embedder.EdgeEmbedder(model_conf.edge_features)
@@ -125,51 +124,65 @@ class FlowModel(nn.Module):
 # NodeEmbedderConfig 클래스 정의
 class NodeEmbedderConfig:
     def __init__(self):
-        self.c_s = 128  # 최종 임베딩 차원
-        self.c_pos_emb = 64  # 위치 임베딩 차원
-        self.c_timestep_emb = 32  # 시간 임베딩 차원
+        self.single_bias_transition_n = 2
+        self.c_s = 256  # 최종 임베딩 차원
+        self.c_pos_emb = 128  # 위치 임베딩 차원
+        self.c_timestep_emb = 128  # 시간 임베딩 차원
+        self.embed_diffuse_mask = False
+        self.max_num_res = 2000
+        self.timestep_int = 1000
 
 class EdgeEmbedderConfig:
     def __init__(self):
-        self.c_s = 128  # 노드 임베딩 차원
-        self.c_p = 64   # 엣지 임베딩 차원
-        self.feat_dim = 32  # 상대 위치 임베딩 차원
-        self.num_bins = 10  # 거리 히스토그램의 빈 수
+        self.c_s = 256  # 노드 임베딩 차원
+        self.c_p = 128   # 엣지 임베딩 차원
+        self.relpos_k = 64
+        self.use_rbf = True
+        self.num_rbf = 32
+        self.feat_dim = 64
+        self.num_bins = 22
+        self.self_condition = True
 
+class ipaConfig :
+    def __init__(self):
+        self.num_blocks = 6
+        self.c_s = 256  
+        self.c_z = 128
+        self.c_hidden = 128
+        self.no_heads = 8
+        self.no_qk_points = 8
+        self.no_v_points = 12
+        self.seq_tfmr_num_heads = 4
+        self.seq_tfmr_num_layers = 2
 
 class ModelConfig:
     def __init__(self):
-        self.ipa = type('ipa', (object,), {})()
-        self.ipa.num_blocks = 2
-        self.ipa.c_s = 128
-        self.ipa.c_z = 64
-        self.ipa.c_hidden = 4
-        self.ipa.no_heads = 4
-        self.ipa.no_qk_points = 4
-        self.ipa.no_v_points = 4
-        self.edge_embed_size = 64
-        self.ipa.seq_tfmr_num_heads = 4
-        self.ipa.seq_tfmr_num_layers = 2
         
-        # Node와 Edge 임베더 설정
+        self.edge_embed_size = 128
+        self.node_embed_size = 256
+        self.symmetric = False
+
+        # ipa, Node&Edge Embedder setting
+        self.ipa = ipaConfig()
         self.node_features =  NodeEmbedderConfig()
         self.edge_features = EdgeEmbedderConfig()
 
 # 입력 값 생성 함수
-def create_input_tensors(batch_size, num_residues, seq_length):
+def create_input_tensors(batch_size, num_residues, seq_len):
     seq = {
-        'res_mask': torch.randint(0, 2, (batch_size, num_residues)).float(),  
-        't': SinusoidalTimeEmbedding(embedding_dim= batch_size * num_residues),  
-        'trans_t': torch.randn(batch_size, num_residues, 3),  
-        'rotmats_t': torch.randn(batch_size, num_residues, 3, 3)  
+        'res_mask': torch.ones(seq_len, batch_size),  # Mask indicating valid residues
+        't': torch.rand(seq_len, batch_size),  # Continuous time steps
+        'trans_t': torch.rand(seq_len, batch_size, 3),  # Translations (3D coordinates)
+        'rotmats_t': torch.rand(seq_len, batch_size, 3, 3),  # Rotation matrices
+        'trans_sc': torch.rand(seq_len, batch_size, 3)  # Side chain translations (optional)
     }
-    
-    timesteps = torch.rand(batch_size , num_residues)
+
+    timesteps = torch.rand(batch_size * num_residues * 3)
     print("2D Timesteps Shape:", len(timesteps.shape))
-    timesteps = timesteps.view(batch_size , num_residues)
-    
-    coord_4d = torch.randn(batch_size, seq_length, 4, 4)
-    
+    # timesteps = timesteps.view(batch_size , num_residues, 2)
+
+    coord_4d = torch.randn(batch_size, seq_length, 4)
+
     return seq, timesteps, coord_4d
 
 model_conf = ModelConfig()
@@ -190,40 +203,39 @@ print("timesteps:", timesteps)  # 1D 텐서 확인
 # print("\n4D Coordinates:")
 # print(coord_4d)
 
-
 # 모델 초기화
 model_conf = ModelConfig()
 model = FlowModel(model_conf)
 
-# print(model)
+print(model)
+output = model(seq, coord_4d)
+print(output)
 
-print(model(seq, coord_4d))
+# # 학습 루프
+# num_epochs = 10
 
-# 학습 루프
-num_epochs = 10
-
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
+# for epoch in range(num_epochs):
+#     model.train()
+#     running_loss = 0.0
     
-    for inputs, labels in train_loader:
-        inputs, labels = inputs.cuda(), labels.cuda()
+#     for inputs, labels in train_loader:
+#         inputs, labels = inputs.cuda(), labels.cuda()
 
-        # 옵티마이저 초기화
-        optimizer.zero_grad()
+#         # 옵티마이저 초기화
+#         optimizer.zero_grad()
 
-        # 모델 출력
-        outputs = model(inputs)
+#         # 모델 출력
+#         outputs = model(inputs)
 
-        # 손실 계산
-        loss = criterion(outputs['backbone_trajectory'], labels)
+#         # 손실 계산
+#         loss = criterion(outputs['backbone_trajectory'], labels)
         
-        # 역전파 및 옵티마이저 스텝
-        loss.backward()
-        optimizer.step()
+#         # 역전파 및 옵티마이저 스텝
+#         loss.backward()
+#         optimizer.step()
 
-        running_loss += loss.item()
+#         running_loss += loss.item()
 
-    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader)}")
+#     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader)}")
 
-print('Training Finished.')
+# print('Training Finished.')
