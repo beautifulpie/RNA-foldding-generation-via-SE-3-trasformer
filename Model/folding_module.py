@@ -13,10 +13,10 @@ import pandas as pd
 import logging
 from pytorch_lightning import LightningModule
 import sys
-sys.path.append("/workspace/4D-Diff-RNA_test_1/Model")
-from analysis import metrics
-from analysis import utils as au
-from new_model import FlowModel
+sys.path.append("/workspace/4D-Diff-RNA_test_1/")
+from Model.analysis import metrics
+from Model.analysis import utils as au
+from Model  import new_model 
 import utils as mu
 from datasets.interpolant import Interpolant 
 from datasets import utils as du
@@ -35,7 +35,7 @@ class FlowModule(LightningModule):
         self._interpolant_cfg = cfg.interpolant
 
         # Set-up vector field prediction model
-        self.model = FlowModel(cfg.model)
+        self.model = new_model.FlowModel(cfg.model)
 
         # Set-up interpolant
         self.interpolant = Interpolant(cfg.interpolant)

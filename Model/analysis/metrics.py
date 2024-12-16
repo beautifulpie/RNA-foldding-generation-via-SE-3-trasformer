@@ -8,7 +8,7 @@ from jaxtyping import Float
 from loguru import logger
 from torch import Tensor
 
-from src.data import nucleotide_constants
+from datasets import nucleotide_constants
 
 def exists(x: object) -> bool:
     return x is not None

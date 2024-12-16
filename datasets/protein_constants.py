@@ -24,7 +24,7 @@ import os
 import numpy as np
 from beartype.typing import List, Mapping, Tuple
 
-import vocabulary
+from datasets import vocabulary
 
 # Internal import (35fd).
 
