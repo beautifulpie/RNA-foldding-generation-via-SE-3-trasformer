@@ -11,12 +11,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from datasets import edge_embedder, node_embedder
 from invariant_point_attention import invariant_point_attention
-from modules import MotionAlignment, SpatialModule, EdgeUpdate, BackboneUpdate, Process_trajectory, SinusoidalTimeEmbedding
+from Model.modules import MotionAlignment, SpatialModule, EdgeUpdate, BackboneUpdate, Process_trajectory, SinusoidalTimeEmbedding
 
 import torch
 import torch.nn as nn
 import datasets.ipa_pytorch as ipa_pytorch
-import torsion_net
+from Model import torsion_net
 from datasets import utils as du  
 
 class FlowModel(nn.Module):
@@ -213,7 +213,7 @@ def custom_collate_fn(batch):
 
 if __name__ == '__main__':
     # Hyperparameters
-    num_epochs = 10
+    num_epochs = 50
     batch_size = 1  # Start with 1 for simplicity; handling lists for multiple batches is trickier.
     learning_rate = 0.001
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

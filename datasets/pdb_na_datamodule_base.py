@@ -8,7 +8,11 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data.distributed import DistributedSampler, dist
 from torch.utils.data import DataLoader
 
-from . import pdb_na_dataset_base
+from datasets import pdb_na_dataset_base
+
+set_mode = 2
+dataset_mode = ["PDBNABaseDataset", "PDB_NA_MDDataset", "PDBNABaseDatasetMD" ]
+dataset = "PDBNABaseDatasetMD" # dataset_mode[set_mode]
 
 class PDBNABaseDataModule(LightningDataModule):
     def __init__(self, data_cfg, inference_cfg=None):
@@ -16,6 +20,8 @@ class PDBNABaseDataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
 
         self.data_cfg = data_cfg
+
+        self.data_test = None
 
         self.data_train = None
         self.data_val = None
@@ -30,14 +36,33 @@ class PDBNABaseDataModule(LightningDataModule):
         pass
 
     def setup(self, stage):
-        self.data_train = pdb_na_dataset_base.PDBNABaseDataset(
-                            self.hparams.data_cfg,
-                            is_training=True,
-                        )
-        self.data_val = pdb_na_dataset_base.PDBNABaseDataset(
-                            self.hparams.data_cfg,
-                            is_training=False,
-                        )
+        if dataset == "PDBNABaseDataset" :
+            self.data_train = pdb_na_dataset_base.PDBNABaseDataset(
+                                self.hparams.data_cfg,
+                                is_training=True,
+                            )
+            self.data_val = pdb_na_dataset_base.PDBNABaseDataset(
+                                self.hparams.data_cfg,
+                                is_training=False,
+                            )
+        elif dataset == "PDB_NA_MDDataset":
+            self.data_train = pdb_na_dataset_base.PDB_NA_MDDataset(
+                                self.hparams.data_cfg,
+                                is_training=True,
+                            )
+            self.data_val = pdb_na_dataset_base.PDB_NA_MDDataset(
+                                self.hparams.data_cfg,
+                                is_training=False,
+                            )
+        elif dataset == "PDBNABaseDatasetMD":
+            self.data_train = pdb_na_dataset_base.PDBNABaseDatasetMD(
+                                self.hparams.data_cfg,
+                                is_training=True,
+                            )
+            self.data_val = pdb_na_dataset_base.PDBNABaseDatasetMD(
+                                self.hparams.data_cfg,
+                                is_training=False,
+                            )
         
     def train_dataloader(self, rank=None, num_replicas=None):
         num_workers = self.data_cfg.num_workers
@@ -57,13 +82,32 @@ class PDBNABaseDataModule(LightningDataModule):
         )
     
     def val_dataloader(self):
-        val_samp = DistributedSampler(self.data_val, shuffle=False)
+        if dist.is_initialized():
+            val_samp = DistributedSampler(self.data_val, shuffle=False)
+        else:
+            val_samp = None  # 분산 학습이 아닌 경우 샘플러 없음
+
         return DataLoader(
             self.data_val,
             sampler=val_samp,
+            batch_size=self.data_cfg.eval_batch_size,
             num_workers=2,
             prefetch_factor=2,
-            persistent_workers=True
+            persistent_workers=True,
+        )
+
+    def test_dataloader(self):
+        if dist.is_initialized():
+            test_samp = DistributedSampler(self.data_test, shuffle=False)
+        else:
+            test_samp = None  # 분산 학습이 아닌 경우 샘플러 없음
+
+        return DataLoader(
+            self.data_test,
+            sampler=test_samp,
+            batch_size=self.data_cfg.eval_batch_size,
+            shuffle=False,
+            num_workers=self.data_cfg.num_workers,
         )
     
     def teardown(self, stage: Optional[str] = None):
@@ -93,14 +137,14 @@ class RNALengthBatcher:
             rank=None,
         ):
         super().__init__()
-        if num_replicas is None:
-            self.num_replicas = dist.get_world_size()
+        # 분산 학습 초기화 여부 확인
+        if dist.is_available() and dist.is_initialized():
+            self.num_replicas = num_replicas if num_replicas is not None else dist.get_world_size()
+            self.rank = rank if rank is not None else dist.get_rank()
         else:
-            self.num_replicas = num_replicas
-        if rank is None:
-            self.rank = dist.get_rank()
-        else:
-            self.rank = rank
+            self.num_replicas = num_replicas if num_replicas is not None else 1
+            self.rank = rank if rank is not None else 0
+        
 
         self._sampler_cfg = sampler_cfg
         self._data_csv = metadata_csv
@@ -167,7 +211,7 @@ class RNALengthBatcher:
         return iter(self.sample_order)
 
     def __len__(self):
-        if hasattr(self, "sample_order"):
+        if hasattr(self, "sample_order"):  
             return len(self.sample_order)
         else:
             return self._num_batches

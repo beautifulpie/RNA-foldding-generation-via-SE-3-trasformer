@@ -245,7 +245,6 @@ def adjust_oxygen_pos(
 
     return atom_37
 
-
 def write_pkl(
         save_path: str, pkl_data: Any, create_dir: bool = False, use_torch=False):
     """Serialize data into a pickle file."""

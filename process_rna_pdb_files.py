@@ -35,6 +35,22 @@ parser.add_argument("--debug", help="Turn on for debugging.", action="store_true
 parser.add_argument("--verbose", help="Whether to print everything.", action="store_true")
 
 
+def process_and_merge_files(file_group, output_dir):
+    merged_data = []
+    for file_path in file_group:
+        result = process_file(file_path, output_dir)
+        if result is not None:
+            # 파일의 processed pickle 데이터를 로드
+            processed_data = torch.load(result["processed_path"])
+            merged_data.append(processed_data)
+    
+    if merged_data:
+        # 데이터 병합 (예: dim=0으로 concatenate)
+        merged_tensor = torch.cat(merged_data, dim=0)
+        return merged_tensor
+    return None
+
+
 def process_file(
     file_path: str,
     write_dir: str,
@@ -61,9 +77,11 @@ def process_file(
     """
     metadata = {}
     pdb_name = os.path.basename(file_path).replace(".pdb", "")
+    rna_name = pdb_name[0:-4]  #실제로 할 땐 인덱스 조정
     metadata["pdb_name"] = pdb_name
+    metadata["rna_name"] = rna_name
     try :
-        pdb_subdir = os.path.join(write_dir, pdb_name[5:9].lower())
+        pdb_subdir = os.path.join(write_dir, pdb_name[0:5].lower())   # 5 ~ 9
     except : 
         pdb_subdir = os.path.join(write_dir, pdb_name[0:4].lower())
     os.makedirs(pdb_subdir, exist_ok=True)

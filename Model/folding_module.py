@@ -23,7 +23,7 @@ from datasets import utils as du
 from datasets import all_atom as rna_all_atom
 from datasets import so3_utils
 from datasets import nucleotide_constants
-from analysis import utils as au
+from Model.analysis import utils as au
 from pytorch_lightning.loggers.wandb import WandbLogger
 
 class FlowModule(LightningModule):
@@ -339,10 +339,14 @@ class FlowModule(LightningModule):
         return train_loss
 
     def configure_optimizers(self):
+        optimizer_config = self._exp_cfg.optimizer
         return torch.optim.AdamW(
             params=self.model.parameters(),
-            **self._exp_cfg.optimizer
+            lr=optimizer_config.lr
         )
+
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx)
 
     def predict_step(self, batch):
         """

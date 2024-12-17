@@ -1,0 +1,13 @@
+pdb_name,rna_name,processed_path,raw_path,num_chains,quaternary_category,num_protein_chains,num_na_chains,seq_len,na_seq_len,modeled_seq_len,modeled_protein_seq_len,modeled_na_seq_len,coil_percent,helix_percent,strand_percent,radius_gyration
+test2_004,test2,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test2/test2_004.pkl,Test_data/test2_004.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test3_001,test3,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test3/test3_001.pkl,Test_data/test3_001.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test3_003,test3,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test3/test3_003.pkl,Test_data/test3_003.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test2_002,test2,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test2/test2_002.pkl,Test_data/test2_002.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test2_003,test2,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test2/test2_003.pkl,Test_data/test2_003.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test3_004,test3,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test3/test3_004.pkl,Test_data/test3_004.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test1_003,test1,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test1/test1_003.pkl,Test_data/test1_003.pdb,1,homomer,0,1,26,26,26,0,26,0.0,0.0,0.0,1.262643988477777
+test2_001,test2,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test2/test2_001.pkl,Test_data/test2_001.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test1_004,test1,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test1/test1_004.pkl,Test_data/test1_004.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test3_002,test3,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test3/test3_002.pkl,Test_data/test3_002.pdb,1,homomer,0,1,41,41,41,0,41,0.0,0.0,0.0,4.118219710102769
+test1_001,test1,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test1/test1_001.pkl,Test_data/test1_001.pdb,1,homomer,0,1,26,26,26,0,26,0.0,0.0,0.0,1.262643988477777
+test1_002,test1,/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/test1/test1_002.pkl,Test_data/test1_002.pdb,1,homomer,0,1,26,26,26,0,26,0.0,0.0,0.0,1.262643988477777
