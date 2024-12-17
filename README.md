@@ -1,4 +1,4 @@
 # Work in progress
-- [ ] Implement the loss function
-- [ ] Implement the embedding
-
+- [x] Implement the loss function
+- [x] Implement the embedding
+- [ ] Set up for training 
