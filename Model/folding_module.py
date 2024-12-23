@@ -101,10 +101,16 @@ class FlowModule(LightningModule):
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
+        
         gt_torsions_1 = noisy_batch['torsion_angles_sin_cos'][:, :, torsions_start_index:torsions_end_index, :].reshape(num_batch, num_res, num_torsions * 2)
         rotmats_t = noisy_batch['rotmats_t']
         gt_rot_vf = so3_utils.calc_rot_vf(rotmats_t, gt_rotmats_1.type(torch.float32))
-
+        print(f"In batch : { noisy_batch['torsion_angles_sin_cos'].shape }")
+        # print(f"gt_trans_1 : {gt_trans_1.shape}")
+        # print(f"gt_rotmats_1 : {gt_rotmats_1.shape}")
+        # print(f"is_na_residue_mask : {is_na_residue_mask.shape}")
+        # print(f"gt_torsions_1 : {gt_torsions_1.shape}")
+        
         gt_bb_atoms = rna_all_atom.to_atom37_rna(
                             gt_trans_1, gt_rotmats_1, 
                             torch.ones_like(is_na_residue_mask),

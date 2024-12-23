@@ -39,7 +39,7 @@ def to_atom37_rna(trans, rots, is_na_residue_mask, torsions=None):
     Remarks:
         Takes RNA rots+trans (ie, a RNA frame) and converts it to the sparse ATOM37 representation
     """
-
+    
     final_atom37 = compute_backbone(
         bb_rigids=create_rna_rigid(rots, trans),
         torsions=torsions, # 16 float values -> NUM_NA_TORSIONS * 2 (each angle is in SO(2))
@@ -85,13 +85,15 @@ def of_na_torsion_angles_to_frames(r, alpha, aatype, rrgdf):
     Returns:
         A torch tensor in ATOM37 format containing all 13 RNA backbone atoms.
     """
+
     # [*, N, 11, 4, 4]
     default_4x4 = rrgdf[aatype, ...]
-
+    # print(f"default : {default_4x4.shape}")
     # [*, N, 11] transformations, i.e.
     #   One [*, N, 11, 3, 3] rotation matrix and
     #   One [*, N, 11, 3]    translation matrix
     default_r = r.from_tensor_4x4(default_4x4)
+
 
     bb_rot1 = alpha.new_zeros((*((1,) * len(alpha.shape[:-1])), 2))
     bb_rot1[..., 1] = 1
@@ -111,8 +113,17 @@ def of_na_torsion_angles_to_frames(r, alpha, aatype, rrgdf):
     #   [0, a_2,-a_1],
     #   [0, a_1, a_2]
     # ]
-
+    # print(f"default_r.get_rots: {default_r.get_rots().shape}")
+    # print(f"default_r.get_rots().get_rot_mats() : {default_r.get_rots().get_rot_mats().shape}")
     all_rots = alpha.new_zeros(default_r.get_rots().get_rot_mats().shape)
+
+    # Fill rotation matrices from alpha
+    # all_rots[..., 0, 0] = 1  # Identity element for 3D rotations
+    # all_rots[..., 1, 1] = alpha[..., 1]  # cos(θ)
+    # all_rots[..., 1, 2] = -alpha[..., 0]  # -sin(θ)
+    # all_rots[..., 2, 1] = alpha[..., 0]  # sin(θ)
+    # all_rots[..., 2, 2] = alpha[..., 1]  # cos(θ)
+
     all_rots[..., 0, 0] = 1  # The upper-left diagonal value for 3D rotations
     all_rots[..., 1, 1] = alpha[..., 1]  # The first sine angle for 3D rotations
     all_rots[..., 1, 2] = -alpha[..., 0]  # The first cosine angle for 3D rotations
@@ -221,6 +232,11 @@ def compute_backbone(bb_rigids, torsions, is_na_residue_mask, aatype=None):
         All-atom RNA backbones with frame atoms and non-frame atoms imputed according to torsion angles.
         Stored in ATOM37 format as a torch tensor.
     """
+    # print(f"bb : {bb_rigids}")
+    # print(f"res_mask : {is_na_residue_mask}")
+    # print(f"SKLKEKEKRKRKRKRK : {bb_rigids[is_na_residue_mask].shape}")
+
+    is_na_residue_mask = is_na_residue_mask.bool()
 
     na_inputs_present = is_na_residue_mask.any().item()
     torsions = torsions.view(torsions.shape[0], torsions.shape[1], NUM_NA_TORSIONS*2) # NOTE: reshape torsion tensor
@@ -248,6 +264,7 @@ def compute_backbone(bb_rigids, torsions, is_na_residue_mask, aatype=None):
     # fill in residue types for RNA [ACGU]
     aatype = (aatype if aatype is not None else torch.zeros(bb_rigids.shape, device=bb_rigids.device, dtype=torch.long))
     
+    
     if na_inputs_present:
         na_bb_rigids = bb_rigids[is_na_residue_mask].reshape(
             new_rots_shape=torch.Size((bb_rigids.shape[0], -1, *rot_dim)),
@@ -264,6 +281,11 @@ def compute_backbone(bb_rigids, torsions, is_na_residue_mask, aatype=None):
             if na_aatype_in_original_range
             else na_aatype
         )
+
+        # print(f"bb_rigids : {bb_rigids[is_na_residue_mask].shape}")
+        # print(f"res_mask : {is_na_residue_mask.shape}")
+        # print(f"new_rots_shape : {torch.Size((bb_rigids.shape[0], -1, *rot_dim))}")
+        # print(f"new_trans_shape : {torch.Size((bb_rigids.shape[0], -1, 3))}")
 
         all_na_frames = of_na_torsion_angles_to_frames(
             r=na_bb_rigids,

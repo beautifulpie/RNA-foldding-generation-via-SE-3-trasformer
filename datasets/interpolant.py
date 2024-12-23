@@ -58,6 +58,7 @@ class Interpolant:
         """
         Returns optimal transport-based interpolated "flow" for translations
         """
+        
         trans_nm_0 = _centered_gaussian(*res_mask.shape, self._device)
 
         trans_0 = trans_nm_0 * du.NM_TO_ANG_SCALE
@@ -65,6 +66,7 @@ class Interpolant:
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1 # flow: t*x1 + (1-t)*x0
         trans_t = _trans_diffuse_mask(trans_t, trans_1, res_mask)
         return trans_t * res_mask[..., None]
+    
     
     def _batch_ot(self, trans_0, trans_1, res_mask):
         """
@@ -124,25 +126,40 @@ class Interpolant:
         Returns:
             batch of corrupted/noisy/interpolated tensors
         """
+        
+        # for key, value in batch.items() :
+        #     if isinstance(value, torch.Tensor):  # Tensor인 경우 shape 출력
+        #         print(f"{key}: {value.shape}")
+        #     elif isinstance(value, list) and all(isinstance(v, tuple) for v in value):  # List[Tuple]인 경우 길이 출력
+        #         print(f"{key}: List of {len(value)} tuples")
+        #     else:  # 다른 타입인 경우 타입 출력
+        #         print(f"{key}: {type(value)}")
 
         noisy_batch = copy.deepcopy(batch)
 
-        trans_1 = batch['trans_1'] # # [B, N, 3] (in Angstrom)
-        rotmats_1 = batch['rotmats_1'] # [B, N, 3, 3]
-        res_mask = batch['res_mask'] # [B, N]
-        num_batch, _ = res_mask.shape
+        trans_1 = batch['trans_1'] # # [T, B, N, 3] (in Angstrom)
+        rotmats_1 = batch['rotmats_1'] # [T, B, N, 3, 3]
+        res_mask = batch['res_mask'] # [T, B, N]
+
+        num_batch, _ = res_mask.shape  #####
 
         # get random timestep in [0, 1] for flow matching
-        t = self.sample_t(num_batch)[:, None] # [B, 1]
+        t = self.sample_t(num_batch)[:, None] # [T * B, 1]
         noisy_batch['t'] = t
 
         # apply corruptions to translations
+        # print(f"trans_1 : {trans_1.shape}")
+        rotmats_t = self._corrupt_rotmats(rotmats_1, t, res_mask)
+        noisy_batch['rotmats_t'] = rotmats_t
+
         trans_t = self._corrupt_trans(trans_1, t, res_mask)
         noisy_batch['trans_t'] = trans_t
 
         # apply corruptions to rotations
         rotmats_t = self._corrupt_rotmats(rotmats_1, t, res_mask)
         noisy_batch['rotmats_t'] = rotmats_t
+
+        noisy_batch['coord_4d'] = batch['coord_4d'] 
         
         return noisy_batch
     
@@ -195,9 +212,9 @@ class Interpolant:
         batch = {
             'res_mask': res_mask,
         }
-
+        # self._sample_cfg = cfg.sampling
         # get diffusion timesteps in order between [0, 1]
-        ts = torch.linspace(self._cfg.min_t, 1.0, self._sample_cfg.num_timesteps)
+        ts = torch.linspace(self._cfg.min_t, 1.0, self._sample_cfg.num_timesteps) 
         t_1 = ts[0]
 
         prot_traj = [(trans_0, rotmats_0)]
@@ -209,6 +226,11 @@ class Interpolant:
             batch['rotmats_t'] = rotmats_t_1
             t = torch.ones((num_batch, 1), device=self._device) * t_1
             batch['t'] = t
+            # Create coord_4d
+            time_coord = t.repeat(1, num_res).unsqueeze(-1)  # [B, N, 1]
+            coord_4d = torch.cat([trans_t_1, time_coord], dim=-1)  # [B, N, 4]
+            batch['coord_4d'] = coord_4d
+
             with torch.no_grad():
                 model_out = model(batch)
 
@@ -237,6 +259,11 @@ class Interpolant:
         batch['rotmats_t'] = rotmats_t_1
         batch['t'] = torch.ones((num_batch, 1), device=self._device) * t_1
         
+        # Final coord_4d
+        time_coord = batch['t'].repeat(1, num_res).unsqueeze(-1)
+        coord_4d = torch.cat([trans_t_1, time_coord], dim=-1)  # [B, N, 4]
+        batch['coord_4d'] = coord_4d
+
         with torch.no_grad():
             model_out = model(batch) # final predicted frames (translations + rotations)
         

@@ -7,12 +7,53 @@ from beartype.typing import Any, Dict, Optional
 from pytorch_lightning import LightningDataModule
 from torch.utils.data.distributed import DistributedSampler, dist
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from datasets import pdb_na_dataset_base
 
 set_mode = 2
 dataset_mode = ["PDBNABaseDataset", "PDB_NA_MDDataset", "PDBNABaseDatasetMD" ]
 dataset = "PDBNABaseDatasetMD" # dataset_mode[set_mode]
+
+def custom_collate_fn(batch):
+    # Determine maximum sizes for each dimension
+    max_lengths = {}
+    for key in batch[0].keys():
+        if isinstance(batch[0][key], torch.Tensor):
+            max_shape = [max(item[key].shape[i] for item in batch) for i in range(len(batch[0][key].shape))]
+            max_lengths[key] = max_shape
+
+    collated_batch = {}
+    for key in batch[0].keys():
+        if isinstance(batch[0][key], torch.Tensor):
+            max_shape = max_lengths[key]
+            padded_tensors = []
+            for item in batch:
+                # Dynamically determine padding dimensions
+                padding = []
+                for i in range(len(max_shape) - 1, -1, -1):
+                    padding.extend([0, max_shape[i] - item[key].shape[i]])
+                padded_tensor = F.pad(item[key], padding, value=0)  # Default padding value
+                padded_tensors.append(padded_tensor)
+
+            stacked_tensors = torch.stack(padded_tensors)
+
+            # Combine Batch and Frame dimensions if the tensor has T and N dimensions
+            if stacked_tensors.ndim >= 3:  # Example: [B, T, N, ...]
+                B, T, *rest = stacked_tensors.shape
+                collated_batch[key] = stacked_tensors.view(B * T, *rest)  # Combine Batch and Frame dimensions
+            else:
+                collated_batch[key] = stacked_tensors
+        elif isinstance(batch[0][key], list):
+            # For list-based items (e.g., trajectories)
+            collated_batch[key] = [item[key] for item in batch]
+        else:
+            # Handle non-tensor items (e.g., metadata)
+            collated_batch[key] = [item[key] for item in batch]
+        
+        
+
+    return collated_batch
 
 class PDBNABaseDataModule(LightningDataModule):
     def __init__(self, data_cfg, inference_cfg=None):
@@ -66,6 +107,11 @@ class PDBNABaseDataModule(LightningDataModule):
         
     def train_dataloader(self, rank=None, num_replicas=None):
         num_workers = self.data_cfg.num_workers
+        dataset_length = len(self.data_train.rna_name)
+
+        if dataset_length == 0:
+            raise ValueError("Dataset is empty. Please check your data processing pipeline.")
+        
         lb = RNALengthBatcher(
                 sampler_cfg=self.data_cfg, 
                 metadata_csv=self.data_train.csv,
@@ -79,6 +125,7 @@ class PDBNABaseDataModule(LightningDataModule):
             prefetch_factor=None if num_workers == 0 else self.data_cfg.prefetch_factor,
             pin_memory=False,
             persistent_workers=True if num_workers > 0 else False,
+            collate_fn=custom_collate_fn,
         )
     
     def val_dataloader(self):
@@ -94,6 +141,7 @@ class PDBNABaseDataModule(LightningDataModule):
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
+            collate_fn=custom_collate_fn,
         )
 
     def test_dataloader(self):
@@ -193,6 +241,9 @@ class RNALengthBatcher:
     def _create_batches(self):
         # Make sure all replicas have the same number of batches Otherwise leads to bugs.
         # See bugs with shuffling https://github.com/Lightning-AI/lightning/issues/10947
+        
+        if len(self._data_csv) == 0:
+            raise ValueError("Dataset is empty. Cannot create batches.")
 
         all_batches = []
         num_augments = -1

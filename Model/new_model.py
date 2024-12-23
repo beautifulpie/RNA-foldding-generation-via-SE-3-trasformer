@@ -70,26 +70,40 @@ class FlowModel(nn.Module):
 
         self.angle_pred_net = torsion_net.TorsionAngleHead(c_in=self._ipa_conf.c_s, c_hidden=128, no_blocks=2, no_angles=8, epsilon=1e-12)
 
-    def forward(self, seq, coord_4d):
+    def forward(self, input_feat):
+        """
+        input_feat:
+            Shape coord_4d : torch.Size([B, N, 4])
+            Shape trans_sc : torch.Size([B, N, 3])
+            Shape res_mask : torch.Size([B, N])
+            Shape trans_t : torch.Size([B, N, 3])
+            Shape rotmats_t : torch.Size([B, N, 3, 3])
+            Shape t : torch.Size([B, 1])
+        """
+        # for key in input_feat.keys():
+        #     print(f"Shape {key} : {input_feat[key].shape}")
+        
+        coord_4d = input_feat['coord_4d']
+
         S = coord_4d.shape[0]
-        node_mask = seq['res_mask']
-        edge_mask = node_mask[:, None] * node_mask[:, :, None]
-        continuous_t = seq['t']
-        trans_t = seq['trans_t']
-        rotmats_t = seq['rotmats_t']
+        node_mask = input_feat['res_mask']
+        edge_mask = node_mask[:, None] * node_mask[:, :, None]  ## node_mask[:, :, None] * node_mask[:, :, :, None] 
+        continuous_t = input_feat['t']   # 
+        trans_t = input_feat['trans_t']
+        rotmats_t = input_feat['rotmats_t']
 
         init_node_embed = self.node_embedder(continuous_t, node_mask)
-        trans_sc = seq.get('trans_sc', torch.zeros_like(trans_t))
+        trans_sc = input_feat.get('trans_sc', torch.zeros_like(trans_t))
         init_edge_embed = self.edge_embedder(init_node_embed, trans_t, trans_sc, edge_mask)
 
         curr_rigids = du.create_rigid(rotmats_t, trans_t)
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
 
-        node_embed = init_node_embed * node_mask[..., None]
-        edge_embed = init_edge_embed * edge_mask[..., None]
+        node_embed = init_node_embed * node_mask[..., None]   # 여기가 고비
+        edge_embed = init_edge_embed * edge_mask[..., None]   # 여기가 고비 2
         backbone_trajectory = []
 
-        for i in range(S):
+        for i in range(S):   # 이거 대신 reshape 해가지고 한번에 넣어 버리기~
             T = coord_4d[i]
 
             for b in range(self._ipa_conf.num_blocks):
@@ -117,6 +131,8 @@ class FlowModel(nn.Module):
 
         return {
             'pred_torsions': pred_torsions,
+            'pred_trans' : pred_trans ,
+            'pred_rotmats' : pred_rotmats,
             'backbone_trajectory': backbone_trajectory,
         }
 
@@ -131,19 +147,22 @@ class ExampleDataset(Dataset):
         return self.num_samples
 
     def __getitem__(self, idx):
-        seq = {
-            'res_mask': torch.ones(self.seq_len),       # [L]
-            't': torch.rand(self.seq_len),              # [L]
-            'trans_t': torch.rand(self.seq_len, 3),     # [L, 3]
-            'rotmats_t': torch.rand(self.seq_len, 3, 3),# [L, 3, 3]
-            'trans_sc': torch.rand(self.seq_len, 3),    # [L, 3]
-            'gt_torsions': torch.rand(self.seq_len, 8), # [L, 8]
-            'gt_backbone_trajectory': [
-                (torch.rand(3), torch.rand(3, 3)) for _ in range(self.seq_len)
-            ]  # List of length L, each entry a (trans, rotmat)
+        input_feat = {
+            'res_mask': torch.ones(self.seq_len),       # [N]
+            't': torch.rand(self.seq_len),              # [N]
+            'trans_t': torch.rand(self.seq_len, 3),     # [N, 3]
+            'rotmats_t': torch.rand(self.seq_len, 3, 3),# [N, 3, 3]
+            'trans_sc': torch.rand(self.seq_len, 3),    # [N, 3]
+            'gt_torsions': torch.rand(self.seq_len, 8), # [N, 8]
+            'gt_backbone_trajectory': [(
+                    torch.rand(3),       # 랜덤 translation vector [3]
+                    torch.rand(3, 3)    # 랜덤 rotation matrix [3, 3]
+                ) 
+                for _ in range(self.seq_len)
+            ],
+            'coord_4d' : torch.rand(self.seq_len, 4)  # [N, 4]
         }
-        coord_4d = torch.rand(self.seq_len, 4)  # [L, 4]
-        return seq, coord_4d
+        return input_feat
 
 class NodeEmbedderConfig:
     def __init__(self):
@@ -187,34 +206,22 @@ class ModelConfig:
         self.node_features = NodeEmbedderConfig()
         self.edge_features = EdgeEmbedderConfig()
 
-# Suppose we have a FlowModel defined elsewhere
-# from your_project import FlowModel
-
 def custom_collate_fn(batch):
-    # batch: list of (seq, coord_4d) pairs
-    seq_list, coord_4d_list = zip(*batch)
-
-    # Keys should be the same for all seq dictionaries
-    seq_keys = seq_list[0].keys()
-    collated_seq = {}
-    for key in seq_keys:
-        vals = [d[key] for d in seq_list]
-        if torch.is_tensor(vals[0]):
-            # Stack tensors along batch dimension
-            collated_seq[key] = torch.stack(vals, dim=0)  # [B, L, ...]
+    collated_batch = {}
+    for key in batch[0].keys():
+        if key == 'gt_backbone_trajectory':
+            # `gt_backbone_trajectory`는 리스트로 유지
+            collated_batch[key] = [item[key] for item in batch]
+        elif isinstance(batch[0][key], torch.Tensor):
+            collated_batch[key] = torch.stack([item[key] for item in batch])
         else:
-            # For gt_backbone_trajectory, we have a list of lists of tuples.
-            # We'll keep it as is, resulting in a list of length batch_size.
-            # Each element: list of length L with (trans, rotmat) tuples.
-            collated_seq[key] = vals
-
-    coord_4d = torch.stack(coord_4d_list, dim=0)  # [B, L, 4]
-    return collated_seq, coord_4d
+            collated_batch[key] = [item[key] for item in batch]
+    return collated_batch
 
 if __name__ == '__main__':
     # Hyperparameters
-    num_epochs = 50
-    batch_size = 1  # Start with 1 for simplicity; handling lists for multiple batches is trickier.
+    num_epochs = 14
+    batch_size = 1
     learning_rate = 0.001
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -223,53 +230,47 @@ if __name__ == '__main__':
     model = FlowModel(model_conf).to(device)
 
     # Example dataset and data loader
-    dataset = ExampleDataset(num_samples=10, seq_len=10, embedding_dim=model_conf.ipa.c_s)
+    dataset = ExampleDataset(num_samples=100, seq_len=50, embedding_dim=model_conf.ipa.c_s)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
 
     # Loss function and optimizer
-    criterion = nn.MSELoss()  # Just as an example
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Training loop
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        for i, (seq, coord_4d) in enumerate(dataloader):
+        for i, input_feat in enumerate(dataloader):
             # Move tensors to device
-            for key, val in seq.items():
-                if torch.is_tensor(val):
-                    seq[key] = val.to(device)
-                else:
-                    # val should be gt_backbone_trajectory: List of length B (here B=1)
-                    # Each element: list of L tuples (trans, rotmat)
-                    # Move each element to device
+            for key, val in input_feat.items():
+                if key == 'gt_backbone_trajectory':
                     seq_trajectories = []
-                    for trajectory in val:  # val is a list of length B
-                        new_traj = [(x.to(device), y.to(device)) for (x, y) in trajectory]
+                    for trajectory in val:  # Process each batch
+                        new_traj = []
+                        for item in trajectory:
+                            if isinstance(item, tuple) and len(item) == 2:
+                                new_traj.append((item[0].to(device), item[1].to(device)))
+                            else:
+                                print(f"Invalid trajectory format: {item}")
                         seq_trajectories.append(new_traj)
-                    seq[key] = seq_trajectories
-
-            coord_4d = coord_4d.to(device)
+                    input_feat[key] = seq_trajectories
+                elif isinstance(val, torch.Tensor):
+                    input_feat[key] = val.to(device)
 
             # Forward pass
-            outputs = model(seq, coord_4d)
+            outputs = model(input_feat)
 
             # Calculate loss
-            pred_torsions = outputs['pred_torsions']  # [B, L, ...]
-            backbone_trajectory = outputs['backbone_trajectory']  # As returned by model
+            pred_torsions = outputs['pred_torsions']
+            backbone_trajectory = outputs['backbone_trajectory']
 
-            gt_torsions = seq['gt_torsions']           # [B, L, 8]
-            gt_backbone_trajectory = seq['gt_backbone_trajectory'] # list for each batch element
+            gt_torsions = input_feat['gt_torsions']
+            gt_backbone_trajectory = input_feat['gt_backbone_trajectory']
             gt_torsions_sin_cos = torch.stack([torch.sin(gt_torsions), torch.cos(gt_torsions)], dim=-1)
 
-
-            # If batch_size > 1, you'll need a loop. For now, B=1.
             torsion_loss = criterion(pred_torsions, gt_torsions_sin_cos)
 
-            # backbone_trajectory and gt_backbone_trajectory might need careful handling.
-            # The model likely returns a list of length L with (pred_trans, pred_rotmat) for each residue.
-            # The gt is similarly structured.
-            # We'll sum losses over L:
             backbone_loss = 0.0
             for (pred_trans, pred_rot), (gt_trans, gt_rot) in zip(backbone_trajectory, gt_backbone_trajectory[0]):
                 backbone_loss += criterion(pred_trans, gt_trans) + criterion(pred_rot, gt_rot)

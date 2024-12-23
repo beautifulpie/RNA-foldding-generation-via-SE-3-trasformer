@@ -835,7 +835,6 @@ class Rigid:
             trans: A corresponding [*, 3] translation tensor
         """
         # (we need device, dtype, etc. from at least one input)
-
         batch_dims, dtype, device, requires_grad = None, None, None, None
         if trans is not None:
             batch_dims = trans.shape[:-1]

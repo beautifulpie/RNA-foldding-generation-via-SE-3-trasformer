@@ -54,8 +54,23 @@ def write_complex_to_pdbs(
     chain_index: np.ndarray = None,
     b_factors=None,
     is_protein_residue_mask=None,
-    is_na_residue_mask=None
+    is_na_residue_mask=None,
+    no_indexing: bool = False
 ):
+
+    """
+    Save RNA atom positions to a PDB file.
+
+    Args:
+        complex_pos: Atom positions (3D or 4D array).
+        output_filepath: Path to save the PDB file.
+        restype: Residue types.
+        chain_index: Chain indices.
+        b_factors: B-factor values for each atom.
+        is_protein_residue_mask: Mask for protein residues.
+        is_na_residue_mask: Mask for nucleic acid residues.
+        no_indexing: If True, skip indexing in the saved PDB file.
+    """
 
     save_path = output_filepath
     na_save_path = str(Path(save_path).parent / ("na_" + os.path.basename(save_path)))
@@ -90,7 +105,7 @@ def write_complex_to_pdbs(
                     # full_complex, model=t + 1, add_end=False, molecule_type_to_write=0
                 # )
                 pdb_na = complex.complex_to_pdb(
-                    full_complex, model=t + 1, add_end=False, molecule_type_to_write=1
+                    full_complex, model=t + 1, add_end=False, molecule_type_to_write=1#, no_indexing=no_indexing
                 )
                 # pdb_complex = complex.complex_to_pdb(
                     # full_complex, model=t + 1, add_end=False, molecule_type_to_write=-1
@@ -116,7 +131,7 @@ def write_complex_to_pdbs(
                 # full_complex, model=1, add_end=False, molecule_type_to_write=0
             # )
             pdb_na = complex.complex_to_pdb(
-                full_complex, model=1, add_end=False, molecule_type_to_write=1
+                full_complex, model=1, add_end=False, molecule_type_to_write=1#, no_indexing = no_indexing
             )
             # pdb_complex = complex.complex_to_pdb(
                 # full_complex, model=1, add_end=False, molecule_type_to_write=-1

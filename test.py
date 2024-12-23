@@ -3,6 +3,7 @@ import torch
 import sys
 sys.path.append("/workspace/4D-Diff-RNA_test_1")
 
+import GPUtil
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from Model.folding_module import FlowModule
@@ -59,19 +60,27 @@ class CheckpointerConfig:
         self.dirpath = "./checkpoints"
         self.filename = "test_model"
 
+class SamplingConfig:
+    def __init__(self):
+        self.num_timesteps = 50
+
+class rot_config:
+    def __init__(self):
+        self.train_schedule = "linear"
+        self.sample_schedule = "exp"
+        self.exp_rate = 10
+
+class trans_config:
+    def __init__(self):
+        self.train_schedule = "linear"
+        self.sample_schedule = "linear"
+
 class InterpolantConfig:
     def __init__(self):
         self.min_t = 1e-2
-        self.rots = {
-            "train_schedule": "linear",
-            "sample_schedule": "exp",
-            "exp_rate": 10
-        }
-        self.trans = {
-            "train_schedule": "linear",
-            "sample_schedule": "linear"
-        }
-        self.sampling = {"num_timesteps": 50}
+        self.rots = rot_config()
+        self.trans = trans_config()
+        self.sampling = SamplingConfig()
         self.self_condition = True
 
 class DataConfig:
@@ -82,14 +91,14 @@ class DataConfig:
             "min_len": 1
         }
         self.min_t = 0.01
-        self.samples_per_eval_length = 5
-        self.num_eval_lengths = 10
-        self.batch_size = 1
-        self.max_batch_size = 28
+        self.samples_per_eval_length = 5   # 5
+        self.num_eval_lengths = 10  #10
+        self.batch_size = 1     # 5
+        self.max_batch_size =  1 # 28  
         self.max_squared_res = 375_000
         self.max_num_res_squared = 375_000
-        self.eval_batch_size = 5
-        self.num_workers = 4
+        self.eval_batch_size = 1   # 5
+        self.num_workers = 1   # 4
         self.prefetch_factor = 100
 
 class BatchOTConfig:
@@ -134,7 +143,7 @@ class TrainerConfig:
         self.log_every_n_steps = 1
         self.deterministic = False
         self.strategy = "ddp"
-        self.check_val_every_n_epoch = 20
+        self.check_val_every_n_epoch = 1 #20
         self.accumulate_grad_batches = 1
 
 class CheckpointerConfig:
@@ -150,7 +159,7 @@ class ExperimentConfig:
     def __init__(self):
         self.debug = True
         self.seed = 123
-        self.num_devices = 4
+        self.num_devices = 1  # 4
         self.warm_start = None
         self.warm_start_cfg_override = True
         self.use_swa = False
@@ -160,7 +169,6 @@ class ExperimentConfig:
         self.optimizer = OptimizerConfig()
         self.trainer = TrainerConfig()
         self.checkpointer = CheckpointerConfig()
-
 
 class Config:
     def __init__(self):
@@ -200,16 +208,17 @@ def train_flow_module():
         mode="min",
     )
 
-    # 조기 종료 콜백 (선택 사항)
+    # 조기 종료 콜백 
     early_stopping_callback = EarlyStopping(
         monitor="val_loss", patience=10, mode="min"
     )
 
     # Trainer 설정
     trainer = Trainer(
-        max_epochs=100,  # 최대 100 epoch 실행
+        max_epochs=15,  # 최대 100 epoch 실행
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices=1,
+        # devices= GPUtil.getAvailable(order='memory', limit = 8)[:cfg.experiment.num_devices],
+        devices=[1],
         callbacks=[checkpoint_callback, early_stopping_callback],
     )
 
