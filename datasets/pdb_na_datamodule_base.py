@@ -51,8 +51,6 @@ def custom_collate_fn(batch):
             # Handle non-tensor items (e.g., metadata)
             collated_batch[key] = [item[key] for item in batch]
         
-        
-
     return collated_batch
 
 class PDBNABaseDataModule(LightningDataModule):

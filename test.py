@@ -39,12 +39,12 @@ class IPAConfig:
         self.c_s = 256
         self.c_z = 128
         self.c_hidden = 128
-        self.no_heads = 8
-        self.no_qk_points = 8
-        self.no_v_points = 12
-        self.seq_tfmr_num_heads = 4
-        self.seq_tfmr_num_layers = 2
-        self.num_blocks = 6
+        self.no_heads = 4
+        self.no_qk_points = 4
+        self.no_v_points = 6
+        self.seq_tfmr_num_heads = 2
+        self.seq_tfmr_num_layers = 1
+        self.num_blocks = 3
 
 class ModelConfig:
     def __init__(self):
@@ -143,7 +143,7 @@ class TrainerConfig:
         self.log_every_n_steps = 1
         self.deterministic = False
         self.strategy = "ddp"
-        self.check_val_every_n_epoch = 1 #20
+        self.check_val_every_n_epoch = 5 #20
         self.accumulate_grad_batches = 1
 
 class CheckpointerConfig:
@@ -217,8 +217,9 @@ def train_flow_module():
     trainer = Trainer(
         max_epochs=15,  # 최대 100 epoch 실행
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        # devices= GPUtil.getAvailable(order='memory', limit = 8)[:cfg.experiment.num_devices],
-        devices=[1],
+        devices= GPUtil.getAvailable(order='memory', limit = 8)[:cfg.experiment.num_devices],
+        # precision = 16, 
+        # devices=[1],
         callbacks=[checkpoint_callback, early_stopping_callback],
     )
 

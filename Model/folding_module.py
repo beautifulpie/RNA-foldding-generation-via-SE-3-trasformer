@@ -17,7 +17,7 @@ sys.path.append("/workspace/4D-Diff-RNA_test_1/")
 from Model.analysis import metrics
 from Model.analysis import utils as au
 from Model  import new_model 
-import utils as mu
+from Model import utils as mu
 from datasets.interpolant import Interpolant 
 from datasets import utils as du
 from datasets import all_atom as rna_all_atom

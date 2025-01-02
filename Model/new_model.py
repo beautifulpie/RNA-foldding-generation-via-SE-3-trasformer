@@ -103,31 +103,33 @@ class FlowModel(nn.Module):
         edge_embed = init_edge_embed * edge_mask[..., None]   # 여기가 고비 2
         backbone_trajectory = []
 
-        for i in range(S):   # 이거 대신 reshape 해가지고 한번에 넣어 버리기~
-            T = coord_4d[i]
+        ## 여서부터 2024.12.24 수정 시작
+        T = coord_4d
 
-            for b in range(self._ipa_conf.num_blocks):
-                V_1 = self.trunk[f'ipa_{b}'](node_embed, edge_embed, curr_rigids, node_mask)
-                V_1 *= node_mask[..., None]
-                node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + V_1)
-                seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](node_embed, src_key_padding_mask=(1 - node_mask).bool())
-                node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
-                node_embed = self.trunk[f'node_transition_{b}'](node_embed)
-                node_embed = node_embed * node_mask[..., None]
-                rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
-                curr_rigids = curr_rigids.compose_q_update_vec(rigid_update, node_mask[..., None])
+        for b in range(self._ipa_conf.num_blocks):
+            V_1 = self.trunk[f'ipa_{b}'](node_embed, edge_embed, curr_rigids, node_mask)
+            V_1 *= node_mask[..., None]
+            node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + V_1)
+            seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](node_embed, src_key_padding_mask=(1 - node_mask).bool())
+            node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
+            node_embed = self.trunk[f'node_transition_{b}'](node_embed)
+            node_embed = node_embed * node_mask[..., None]
+            rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
+            curr_rigids = curr_rigids.compose_q_update_vec(rigid_update, node_mask[..., None])
 
-                if b < self._ipa_conf.num_blocks - 1:
-                    edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
-                    edge_embed *= edge_mask[..., None]
+            if b < self._ipa_conf.num_blocks - 1:
+                edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
+                edge_embed *= edge_mask[..., None]
 
-            curr_rigids = self.rigids_nm_to_ang(curr_rigids)
-            pred_trans = curr_rigids.get_trans()
-            pred_rotmats = curr_rigids.get_rots().get_rot_mats()
+        curr_rigids = self.rigids_nm_to_ang(curr_rigids)
+        pred_trans = curr_rigids.get_trans()
+        pred_rotmats = curr_rigids.get_rots().get_rot_mats()
 
-            backbone_trajectory.append((pred_trans, pred_rotmats))
+        backbone_trajectory.append((pred_trans, pred_rotmats))
 
         _, pred_torsions = self.angle_pred_net(node_embed, init_node_embed)
+
+        ## 여까지 2024.12.24 수정 시작
 
         return {
             'pred_torsions': pred_torsions,

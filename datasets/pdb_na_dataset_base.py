@@ -471,8 +471,6 @@ class PDBNABaseDatasetMD(Dataset):
         #     else:  # 다른 타입인 경우 타입 출력
         #         print(f"{key}: {type(value)}")
 
-        
-        
         return combined_tensor
 
     def __getitem__(self, idx):
