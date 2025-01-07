@@ -18,6 +18,7 @@ import torch.nn as nn
 import datasets.ipa_pytorch as ipa_pytorch
 from Model import torsion_net
 from datasets import utils as du  
+import pickle
 
 class FlowModel(nn.Module):
 
@@ -31,6 +32,25 @@ class FlowModel(nn.Module):
 
         self.node_embedder = node_embedder.NodeEmbedder(model_conf.node_features)
         self.edge_embedder = edge_embedder.EdgeEmbedder(model_conf.edge_features)
+
+        with open(model_conf.node_features.Node_param, "rb") as f:
+            node_param = pickle.load(f)
+
+        with open(model_conf.edge_features.Edge_param, "rb") as f:
+            edge_param = pickle.load(f)
+        
+        self.node_embedder.linear.weight.data = node_param[0]
+        self.node_embedder.linear.bias.data = node_param[1]
+        for param in self.node_embedder.parameters():
+            param.requires_grad = False
+
+        state_dict = self.edge_embedder.state_dict()
+        for key, weight in zip(state_dict.keys(), edge_param):
+            state_dict[key] = torch.tensor(weight)
+        self.edge_embedder.load_state_dict(state_dict)
+        
+        for param in self.edge_embedder.parameters():
+            param.requires_grad = False
 
         self.spatial_module = SpatialModule(input_dim=128, output_dim=128, num_heads=4)
         self.motion_alignment = MotionAlignment(input_dim=128, output_dim=128, num_heads=4)
@@ -99,11 +119,11 @@ class FlowModel(nn.Module):
         curr_rigids = du.create_rigid(rotmats_t, trans_t)
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
 
-        node_embed = init_node_embed * node_mask[..., None]   # 여기가 고비
-        edge_embed = init_edge_embed * edge_mask[..., None]   # 여기가 고비 2
+        node_embed = init_node_embed * node_mask[..., None]   
+        edge_embed = init_edge_embed * edge_mask[..., None]   
         backbone_trajectory = []
 
-        ## 여서부터 2024.12.24 수정 시작
+        ## 여기서부터 2024.12.24 수정 시작
         T = coord_4d
 
         for b in range(self._ipa_conf.num_blocks):

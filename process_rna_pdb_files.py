@@ -77,13 +77,13 @@ def process_file(
     """
     metadata = {}
     pdb_name = os.path.basename(file_path).replace(".pdb", "")
-    rna_name = pdb_name[0:-4]  #실제로 할 땐 인덱스 조정
+    rna_name = pdb_name[5:-7]  #실제로 할 땐 인덱스 조정
     metadata["pdb_name"] = pdb_name
     metadata["rna_name"] = rna_name
     try :
-        pdb_subdir = os.path.join(write_dir, pdb_name[0:5].lower())   # 5 ~ 9
+        pdb_subdir = os.path.join(write_dir, pdb_name[5:-7].lower())   # 5 ~ 9
     except : 
-        pdb_subdir = os.path.join(write_dir, pdb_name[0:4].lower())
+        pdb_subdir = os.path.join(write_dir, pdb_name[5:9].lower())
     os.makedirs(pdb_subdir, exist_ok=True)
     processed_path = os.path.join(pdb_subdir, f"{pdb_name}.pkl")
     metadata["processed_path"] = os.path.abspath(processed_path)

@@ -475,7 +475,7 @@ class PDBNABaseDatasetMD(Dataset):
 
     def __getitem__(self, idx):
         if idx >= len(self.rna_name):
-            rna = self.rna_name[0]     # 수정할 것 
+            rna = self.rna_name[idx % len(self.rna_name)]     # 수정할 것 
             # raise IndexError(f"Index {idx} is out of range for rna_name with length {len(self.rna_name)}")
         else :
            rna = self.rna_name[idx]    
@@ -493,7 +493,6 @@ class PDBNABaseDatasetMD(Dataset):
 
         input_feat = {
             'res_mask': combined_feats['res_mask'],       # [T, N]
-            # 't': torch.rand(max_length_for_residue),   # [T, N] , corrupt noise에서 추가함 
             'trans_1': combined_feats['trans_1'],       # [T, N, 3]
             'rotmats_1': combined_feats['rotmats_1'],# [T, N, 3, 3]
             'trans_sc': torch.zeros_like(combined_feats['trans_1']),    # [T, N, 3]

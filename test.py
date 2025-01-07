@@ -3,15 +3,38 @@ import torch
 import sys
 sys.path.append("/workspace/4D-Diff-RNA_test_1")
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
 import GPUtil
 from pytorch_lightning import Trainer
+from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from Model.folding_module import FlowModule
 from datasets.pdb_na_datamodule_base import PDBNABaseDataModule
+import logging
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 # 경로 설정
 TEST_DATA_PATH = "./Test_data/test_processing/"
 RNA_METADATA_CSV = os.path.join(TEST_DATA_PATH, "rna_metadata_debug.csv")
+
+def get_pylogger(name=__name__) -> logging.Logger:
+    """Initializes multi-GPU-friendly python command line logger."""
+
+    logger = logging.getLogger(name)
+
+    # this ensures all logging levels get marked with the rank zero decorator
+    # otherwise logs would get multiplied for each GPU process in multi-GPU setup
+    logging_levels = ("debug", "info", "warning", "error", "exception", "fatal", "critical")
+    for level in logging_levels:
+        setattr(logger, level, rank_zero_only(getattr(logger, level)))
+
+    return logger
+
+log = get_pylogger(__name__)
+torch.set_float32_matmul_precision('high')
+
 
 class NodeFeaturesConfig:
     def __init__(self):
@@ -21,6 +44,7 @@ class NodeFeaturesConfig:
         self.embed_diffuse_mask = False
         self.max_num_res = 2000
         self.timestep_int = 1000
+        self.Node_param = "/workspace/4D-Diff-RNA_test_1/node_embedder_param.pickle"
 
 class EdgeFeaturesConfig:
     def __init__(self):
@@ -33,6 +57,7 @@ class EdgeFeaturesConfig:
         self.feat_dim = 64
         self.num_bins = 22
         self.self_condition = True
+        self.Edge_param = "/workspace/4D-Diff-RNA_test_1/edge_embedder_param.pickle"
 
 class IPAConfig:
     def __init__(self):
@@ -93,11 +118,11 @@ class DataConfig:
         self.min_t = 0.01
         self.samples_per_eval_length = 5   # 5
         self.num_eval_lengths = 10  #10
-        self.batch_size = 1     # 5
-        self.max_batch_size =  1 # 28  
+        self.batch_size = 2     # 5
+        self.max_batch_size =  2 # 28  
         self.max_squared_res = 375_000
         self.max_num_res_squared = 375_000
-        self.eval_batch_size = 1   # 5
+        self.eval_batch_size = 2   # 5
         self.num_workers = 1   # 4
         self.prefetch_factor = 100
 
@@ -199,7 +224,7 @@ def train_flow_module():
     # FlowModule 초기화
     flow_module = FlowModule(cfg)
 
-    # 모델 체크포인트 콜백 설정f    
+    # 모델 체크포인트 콜백 설정
     checkpoint_callback = ModelCheckpoint(
         dirpath="./checkpoints",
         filename="best-checkpoint",
@@ -215,11 +240,11 @@ def train_flow_module():
 
     # Trainer 설정
     trainer = Trainer(
-        max_epochs=15,  # 최대 100 epoch 실행
+        max_epochs=100,  # 최대 100 epoch 실행
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        devices= GPUtil.getAvailable(order='memory', limit = 8)[:cfg.experiment.num_devices],
+        #devices= GPUtil.getAvailable(order='memory', limit = 8)[:cfg.experiment.num_devices],
         # precision = 16, 
-        # devices=[1],
+        devices=[ 1],
         callbacks=[checkpoint_callback, early_stopping_callback],
     )
 
