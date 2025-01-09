@@ -3,7 +3,7 @@ import numpy as np
 import torch as nn
 from . import rigid_utils as ru
 import random
-from datasets import all_atom
+from data import all_atom
 
 def cal_rmsd_numpy(coord_1, coord_2):
     rmsd = np.sqrt(((coord_1 - coord_2) ** 2).mean())    ## this would be the formula

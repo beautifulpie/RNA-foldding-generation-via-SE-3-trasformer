@@ -6,7 +6,7 @@ sys.path.append("/workspace/4D-Diff-RNA_test_1/")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from datasets import edge_embedder, node_embedder
+from data import edge_embedder, node_embedder
 from invariant_point_attention import invariant_point_attention
 from modules import MotionAlignment, SpatialModule, EdgeUpdate, BackboneUpdate, Process_trajectory, SinusoidalTimeEmbedding
 

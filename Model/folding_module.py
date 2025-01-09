@@ -18,11 +18,11 @@ from Model.analysis import metrics
 from Model.analysis import utils as au
 from Model  import new_model 
 from Model import utils as mu
-from datasets.interpolant import Interpolant 
-from datasets import utils as du
-from datasets import all_atom as rna_all_atom
-from datasets import so3_utils
-from datasets import nucleotide_constants
+from data.interpolant import Interpolant 
+from data import utils as du
+from data import all_atom as rna_all_atom
+from data import so3_utils
+from data import nucleotide_constants
 from Model.analysis import utils as au
 from pytorch_lightning.loggers.wandb import WandbLogger
 

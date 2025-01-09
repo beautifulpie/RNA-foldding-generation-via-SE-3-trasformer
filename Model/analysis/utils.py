@@ -8,7 +8,7 @@ https://github.com/Profluent-Internships/MMDiff/blob/main/src/models/components/
 import numpy as np
 import os, re
 from pathlib import Path
-from datasets import complex
+from data import complex
 
 def create_full_complex(
     atom37: np.ndarray,

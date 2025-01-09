@@ -9,15 +9,15 @@ from torch.utils.data import dataloader, Dataset, DataLoader, TensorDataset
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-from datasets import edge_embedder, node_embedder
+from data import edge_embedder, node_embedder
 from invariant_point_attention import invariant_point_attention
 from Model.modules import MotionAlignment, SpatialModule, EdgeUpdate, BackboneUpdate, Process_trajectory, SinusoidalTimeEmbedding
 
 import torch
 import torch.nn as nn
-import datasets.ipa_pytorch as ipa_pytorch
+import data.ipa_pytorch as ipa_pytorch
 from Model import torsion_net
-from datasets import utils as du  
+from data import utils as du  
 import pickle
 
 class FlowModel(nn.Module):
