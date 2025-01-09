@@ -10,8 +10,8 @@ from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from datasets import PDBNABaseDataModule
-from Model import folding_module
+from data.pdb_na_datamodule_base import PDBNABaseDataModule
+from Model.folding_module import FlowModule
 import wandb
 
 import logging
@@ -30,7 +30,6 @@ def get_pylogger(name=__name__) -> logging.Logger:
 
     return logger
 
-
 def flatten_dict(raw_dict):
     """Flattens a nested dict."""
     flattened = []
@@ -43,7 +42,6 @@ def flatten_dict(raw_dict):
             flattened.append((k, v))
     return flattened
 
-
 log = get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
@@ -52,7 +50,7 @@ class Experiment:
         self._cfg = cfg
         self._data_cfg = cfg.data_cfg
         self._exp_cfg = cfg.experiment
-        self._model = folding_module.FlowModule(self._cfg)
+        self._model = FlowModule(self._cfg)
         self._datamodule = PDBNABaseDataModule(data_cfg=self._data_cfg)
  
     def train(self):
@@ -62,7 +60,7 @@ class Experiment:
             log.info("Debug mode.")
             logger = None
             self._exp_cfg.num_devices = 1
-            self._data_cfg.loader.num_workers = 0
+            self._data_cfg.num_workers = 0
         else:
             logger = WandbLogger(**self._exp_cfg.wandb,)
             

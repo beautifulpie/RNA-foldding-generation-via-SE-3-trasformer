@@ -18,8 +18,8 @@ import pandas as pd
 import torch
 from Bio import PDB
 
-from datasets import utils
-from datasets import parsers
+from data import utils
+from data import parsers
 
 # Define the parser
 parser = argparse.ArgumentParser(description="PDB processing script.")
@@ -34,7 +34,7 @@ parser.add_argument(
 parser.add_argument("--debug", help="Turn on for debugging.", action="store_true")
 parser.add_argument("--verbose", help="Whether to print everything.", action="store_true")
 
-
+ 
 def process_and_merge_files(file_group, output_dir):
     merged_data = []
     for file_path in file_group:
@@ -77,11 +77,11 @@ def process_file(
     """
     metadata = {}
     pdb_name = os.path.basename(file_path).replace(".pdb", "")
-    rna_name = pdb_name[5:-7]  #실제로 할 땐 인덱스 조정
+    rna_name = pdb_name[5:-10]  #실제로 할 땐 인덱스 조정
     metadata["pdb_name"] = pdb_name
     metadata["rna_name"] = rna_name
     try :
-        pdb_subdir = os.path.join(write_dir, pdb_name[5:-7].lower())   # 5 ~ 9
+        pdb_subdir = os.path.join(write_dir, pdb_name[5:-10].lower())   # 5 ~ 9
     except : 
         pdb_subdir = os.path.join(write_dir, pdb_name[5:9].lower())
     os.makedirs(pdb_subdir, exist_ok=True)
@@ -90,7 +90,7 @@ def process_file(
     metadata["raw_path"] = file_path
     if skip_existing and os.path.exists(metadata["processed_path"]):
         return None
-    parser = PDB.PDBParser(QUIET=True)
+    parser = PDB.PDBParser(QUIET=True, PERMISSIVE=True)
     structure = parser.get_structure(pdb_name, file_path)
 
     # Extract all chains

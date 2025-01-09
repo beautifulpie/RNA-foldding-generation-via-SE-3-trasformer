@@ -11,7 +11,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from Model.folding_module import FlowModule
-from datasets.pdb_na_datamodule_base import PDBNABaseDataModule
+from data.pdb_na_datamodule_base import PDBNABaseDataModule
 import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
