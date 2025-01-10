@@ -16,8 +16,8 @@ import logging
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 # 경로 설정
-TEST_DATA_PATH = "./Test_data/test_processing/"
-RNA_METADATA_CSV = os.path.join(TEST_DATA_PATH, "rna_metadata_debug.csv")
+TEST_DATA_PATH = "./Training_data/"
+RNA_METADATA_CSV = "/workspace/4D-Diff-RNA_test_1/Training_data/rna_metadata_debug.csv"
 
 def get_pylogger(name=__name__) -> logging.Logger:
     """Initializes multi-GPU-friendly python command line logger."""
@@ -110,7 +110,7 @@ class InterpolantConfig:
 
 class DataConfig:
     def __init__(self):
-        self.csv_path = "/workspace/4D-Diff-RNA_test_1/Test_data/test_processing/rna_metadata_debug.csv"
+        self.csv_path = "/workspace/4D-Diff-RNA_test_1/Training_data/rna_metadata_debug.csv"
         self.filtering = {
             "max_len": 1000,
             "min_len": 1
