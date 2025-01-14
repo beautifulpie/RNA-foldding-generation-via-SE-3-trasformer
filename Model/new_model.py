@@ -134,8 +134,11 @@ class FlowModel(nn.Module):
             node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
             node_embed = self.trunk[f'node_transition_{b}'](node_embed)
             node_embed = node_embed * node_mask[..., None]
+
             rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
             curr_rigids = curr_rigids.compose_q_update_vec(rigid_update, node_mask[..., None])
+
+            
 
             if b < self._ipa_conf.num_blocks - 1:
                 edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
