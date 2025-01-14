@@ -274,6 +274,7 @@ def process_serially(all_paths, write_dir, skip_existing=False, verbose=False):
     for file_path in tqdm(all_paths):
         try:
             start_time = time.time()
+            print(file_path)
             metadata = process_file(
                 file_path, write_dir, skip_existing=skip_existing, verbose=verbose
             )
