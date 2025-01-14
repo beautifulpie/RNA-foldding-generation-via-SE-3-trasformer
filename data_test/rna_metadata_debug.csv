@@ -1,5 +1,0 @@
-pdb_name,processed_path,raw_path,num_chains,quaternary_category,num_protein_chains,num_na_chains,seq_len,na_seq_len,modeled_seq_len,modeled_protein_seq_len,modeled_na_seq_len,coil_percent,helix_percent,strand_percent,radius_gyration
-fold_3ZBB_0001,/workspace/4D-Diff-RNA_test_1/data_test/3zbb/fold_3ZBB_0001.pkl,data_test/fold_3ZBB_0001.pdb,1,homomer,0,1,2,2,2,0,2,0.0,0.0,0.0,0.39375993631581746
-fold_A1XY_0002,/workspace/4D-Diff-RNA_test_1/data_test/a1xy/fold_A1XY_0002.pkl,data_test/fold_A1XY_0002.pdb,1,homomer,0,1,2,2,2,0,2,0.0,0.0,0.0,0.39375993631581746
-fold_A1XY_0001,/workspace/4D-Diff-RNA_test_1/data_test/a1xy/fold_A1XY_0001.pkl,data_test/fold_A1XY_0001.pdb,1,homomer,0,1,1,1,1,0,1,0.0,0.0,0.0,0.2623007206294845
-fold_3ZBB_0002,/workspace/4D-Diff-RNA_test_1/data_test/3zbb/fold_3ZBB_0002.pkl,data_test/fold_3ZBB_0002.pdb,1,homomer,0,1,2,2,2,0,2,0.0,0.0,0.0,0.39375993631581746
