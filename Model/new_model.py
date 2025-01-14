@@ -137,18 +137,15 @@ class FlowModel(nn.Module):
 
             rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
             curr_rigids = curr_rigids.compose_q_update_vec(rigid_update, node_mask[..., None])
-
             
+            curr_rigids = self.rigids_nm_to_ang(curr_rigids)
+            pred_trans = curr_rigids.get_trans()
+            pred_rotmats = curr_rigids.get_rots().get_rot_mats()
+            backbone_trajectory.append((pred_trans, pred_rotmats))
 
             if b < self._ipa_conf.num_blocks - 1:
                 edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
-                edge_embed *= edge_mask[..., None]
-
-        curr_rigids = self.rigids_nm_to_ang(curr_rigids)
-        pred_trans = curr_rigids.get_trans()
-        pred_rotmats = curr_rigids.get_rots().get_rot_mats()
-
-        backbone_trajectory.append((pred_trans, pred_rotmats))
+                edge_embed *= edge_mask[..., None]     
 
         _, pred_torsions = self.angle_pred_net(node_embed, init_node_embed)
 
