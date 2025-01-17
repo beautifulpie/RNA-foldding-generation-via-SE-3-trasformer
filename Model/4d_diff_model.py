@@ -54,39 +54,38 @@ class FlowModel(nn.Module):
 
         self.spatial_module = SpatialModule(input_dim=128, output_dim=128, num_heads=4)
         self.motion_alignment = MotionAlignment(input_dim=128, output_dim=128, num_heads=4)
-        self.edge_update = EdgeUpdate(D_v= 128, D_z= 64)
-        self.backbone_update = BackboneUpdate(D_v= 128)
+        # self.edge_update = EdgeUpdate(D_v= 128, D_z= 64)
+        # self.backbone_update = BackboneUpdate(D_v= 128)
 
         # Attention trunk
         self.trunk = nn.ModuleDict()
         for b in range(self._ipa_conf.num_blocks):
             self.trunk[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._ipa_conf)
-            self.trunk[f'ipa_ln_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
-            tfmr_in = self._ipa_conf.c_s  
-            tfmr_layer = torch.nn.TransformerEncoderLayer(
-                d_model=tfmr_in,
-                nhead=self._ipa_conf.seq_tfmr_num_heads,
-                dim_feedforward=tfmr_in,
-                batch_first=True,
-                dropout=0.0,
-                norm_first=False
-            )
-            self.trunk[f'seq_tfmr_{b}'] = torch.nn.TransformerEncoder(
-                tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
-            self.trunk[f'post_tfmr_{b}'] = ipa_pytorch.Linear(
-                tfmr_in, self._ipa_conf.c_s, init="final")
+            # self.trunk[f'ipa_ln_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
+            # tfmr_in = self._ipa_conf.c_s  
+            # tfmr_layer = torch.nn.TransformerEncoderLayer(
+            #     d_model=tfmr_in,
+            #     nhead=self._ipa_conf.seq_tfmr_num_heads,
+            #     dim_feedforward=tfmr_in,
+            #     batch_first=True,
+            #     dropout=0.0,
+            #     norm_first=False
+            # )
+            # self.trunk[f'seq_tfmr_{b}'] = torch.nn.TransformerEncoder(
+            #     tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
+            # self.trunk[f'post_tfmr_{b}'] = ipa_pytorch.Linear(
+            #     tfmr_in, self._ipa_conf.c_s, init="final")
             self.trunk[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
                 c=self._ipa_conf.c_s)
             self.trunk[f'bb_update_{b}'] = ipa_pytorch.BackboneUpdate(
                 self._ipa_conf.c_s, use_rot_updates=True)
-
-            if b < self._ipa_conf.num_blocks-1:
-                edge_in = self._model_conf.edge_embed_size
-                self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
-                    node_embed_size=self._ipa_conf.c_s,
-                    edge_embed_in=edge_in,
-                    edge_embed_out=self._model_conf.edge_embed_size,
-                )
+            
+            edge_in = self._model_conf.edge_embed_size
+            self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
+                node_embed_size=self._ipa_conf.c_s,
+                edge_embed_in=edge_in,
+                edge_embed_out=self._model_conf.edge_embed_size,
+            )
 
         self.angle_pred_net = torsion_net.TorsionAngleHead(c_in=self._ipa_conf.c_s, c_hidden=128, no_blocks=2, no_angles=8, epsilon=1e-12)
 
@@ -124,37 +123,41 @@ class FlowModel(nn.Module):
         edge_embed = init_edge_embed * edge_mask[..., None]   
         backbone_trajectory = []
 
+        V_0 = node_embed
+
         T = coord_4d
 
         for b in range(self._ipa_conf.num_blocks):
             V_1 = self.trunk[f'ipa_{b}'](node_embed, edge_embed, curr_rigids, node_mask)
             V_1 *= node_mask[..., None]
+            V_2 = V_1 + V_0
+            V_3 = torch.concat((V_2, V_0), dim = 0)
+            V_new_spaital= self.spatial_module(V_3)
+            V_4 = V_new_spaital + V_2
+            V_5 = torch.concat((V_4, V_0), dim = 0)
+            V_new_motion = self.motion_alignment(V_5)
+            V_new = V_4 + V_new_motion
+
+            node_embed = V_new
+            edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
+            edge_embed *= edge_mask[..., None] 
+
             node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + V_1)
             seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](node_embed, src_key_padding_mask=(1 - node_mask).bool())
             node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
             node_embed = self.trunk[f'node_transition_{b}'](node_embed)
             node_embed = node_embed * node_mask[..., None]
-            #
-            
-            #
+
             rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
             curr_rigids = curr_rigids.compose_q_update_vec(rigid_update, node_mask[..., None])
-
-            if b < self._ipa_conf.num_blocks - 1:
-                edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
-                edge_embed *= edge_mask[..., None]     
-
+          
             _, pred_torsions = self.angle_pred_net(node_embed, init_node_embed)
 
             curr_rigids = self.rigids_nm_to_ang(curr_rigids)
             pred_trans = curr_rigids.get_trans()
             pred_rotmats = curr_rigids.get_rots().get_rot_mats()
             backbone_trajectory.append((pred_trans, pred_rotmats))
-
-        
-
-        ## 여까지 2024.12.24 수정 시작
-
+            
         return {
             'pred_torsions': pred_torsions,
             'pred_trans' : pred_trans ,

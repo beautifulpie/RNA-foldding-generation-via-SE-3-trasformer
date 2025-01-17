@@ -280,6 +280,8 @@ class PDBNABaseDatasetMD(Dataset):
         self._filter_eval_split = filter_eval_split
         self._inference_cfg = inference_cfg
         self._init_metadata_and_splits()
+        self._ddpm = None
+        self._sequence_ddpm = None
 
     def _init_metadata_and_splits(self):
         pdb_csv = pd.read_csv(self.data_conf.csv_path)
@@ -315,7 +317,8 @@ class PDBNABaseDatasetMD(Dataset):
         입력 : 같은 RNA들 입력 받기
         출력 : 프로세싱 해서 텐서로 출력
         """
-        processed_frames = []
+        trajectory = []
+        pdb_file_paths.sort()
 
         for pdb_path in pdb_file_paths:
             try:
@@ -412,7 +415,7 @@ class PDBNABaseDatasetMD(Dataset):
             # cleaner version
             final_feats = {
                 "torsion_angles_sin_cos": chain_feats["torsion_angles_sin_cos"],
-                "is_na_residue_mask": processed_feats["is_na_residue_mask"]
+                "is_na_residue_mask": processed_feats["is_na_residue_mask"],
             }
 
             rigids_1 = rigid_utils.Rigid.from_tensor_4x4(
@@ -440,19 +443,20 @@ class PDBNABaseDatasetMD(Dataset):
             final_feats = du.pad_feats(final_feats, max_length_for_residue)
             final_feats = self.convert_dict_float64_items_to_float32(final_feats)
 
-            processed_frames.append(final_feats)
+            trajectory.append(final_feats["trans_1"], final_feats["rotmats_1"])
 
         combined_tensor = {
             # 'torsion_angles_sin_cos': [],
             # 'rotmats_1': [],
             # 'trans_1': [],
             # 'res_mask': [],
-            # 'is_na_residue_mask': []
+            # 'is_na_residue_mask': [],
+            # 'Backbone_trajectory' : []
         }
 
-        time_dim = len(processed_frames)
-        for key in processed_frames[0].keys():
-            time_tensors = [frame[key] for frame in processed_frames]
+        time_dim = len(trajectory)
+        for key in trajectory[0].keys():
+            time_tensors = [frame[key] for frame in trajectory]
             
             # 모든 요소를 torch.Tensor로 변환
             # 이미 torch.Tensor인 경우에는 그대로 유지됨
@@ -460,6 +464,8 @@ class PDBNABaseDatasetMD(Dataset):
             
             stacked_tensor = torch.stack(time_tensors, dim=0)
             combined_tensor[key] = stacked_tensor
+        
+        combined_tensor["trajectory"] = trajectory
             
         # print(f"{key} stacked shape: {stacked_tensor.shape}")
 
@@ -479,6 +485,7 @@ class PDBNABaseDatasetMD(Dataset):
             # raise IndexError(f"Index {idx} is out of range for rna_name with length {len(self.rna_name)}")
         else :
            rna = self.rna_name[idx]    
+
         filtered_df = self.csv[self.csv['rna_name'] == rna]
         pdb_file_paths = filtered_df['processed_path'].tolist()
 
@@ -497,24 +504,19 @@ class PDBNABaseDatasetMD(Dataset):
             'rotmats_1': combined_feats['rotmats_1'],# [T, N, 3, 3]
             'trans_sc': torch.zeros_like(combined_feats['trans_1']),    # [T, N, 3]
             'gt_torsions': torsion_angles.view(torsion_angles.shape[0], -1), # [T, N, 8]
-            'gt_backbone_trajectory': [(   # 이부분 없애고 시간에 따라 구현 (모델 수정)
-                    torch.rand(3),       # 랜덤 translation vector [3]
-                    torch.rand(3, 3)    # 랜덤 rotation matrix [3, 3]
-                )                        
-                for _ in range(max_length_for_residue)
-            ],
+            'gt_backbone_trajectory': combined_feats["trajectory"],   # [T, N, 3, 8]
             "coord_4d" : torch.rand(Frame, max_length_for_residue, 3), # Shape = [T, N, 3]
             "is_na_residue_mask" : combined_feats['res_mask'],
             'torsion_angles_sin_cos': torsion_angles
         }
 
-        # for key, value in input_feat.items():
-        #     if isinstance(value, torch.Tensor):  # Tensor인 경우 shape 출력
-        #         print(f"{key}: {value.shape}")
-        #     elif isinstance(value, list) and all(isinstance(v, tuple) for v in value):  # List[Tuple]인 경우 길이 출력
-        #         print(f"{key}: List of {len(value)} tuples")
-        #     else:  # 다른 타입인 경우 타입 출력
-        #         print(f"{key}: {type(value)}")
+        for key, value in input_feat.items():
+            if isinstance(value, torch.Tensor):  # Tensor인 경우 shape 출력
+                print(f"{key}: {value.shape}")
+            elif isinstance(value, list) and all(isinstance(v, tuple) for v in value):  # List[Tuple]인 경우 길이 출력
+                print(f"{key}: List of {len(value)} tuples")
+            else:  # 다른 타입인 경우 타입 출력
+                print(f"{key}: {type(value)}")
 
 
         return input_feat
@@ -551,9 +553,11 @@ class PDBNABaseDatasetMD(Dataset):
         try:
             processed_feats = torch.load(path)
             if "torsion_angles_sin_cos" not in processed_feats or "bb_mask" not in processed_feats:
+                print(f"Missing keys in {path}")
                 return False
             return True
-        except:
+        except Exception as e:
+            print(f"Error loading file {path}: {e}")
             return False
         
     def convert_dict_float64_items_to_float32(self, dictionary):

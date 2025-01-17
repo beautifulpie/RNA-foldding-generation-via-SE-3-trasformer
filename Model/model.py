@@ -104,12 +104,14 @@ class IPATransformer(nn.Module):
         return points_global
 
 
+
+
 class DenoisingModel(nn.Module):
     def __init__(self, model_conf):
         super(DenoisingModel, self).__init__()
         self._model_conf = model_conf
         self.num_iterations = 4  #config.num_iterations
-        self.ipa = IPATransformer()
+        self.ipa = nn.ModuleList([invariant_point_attention(dim = dim, **kwargs)])
         self.spatial_module = SpatialModule()
         self.motion_alignment = MotionAlignment()
         self.edge_update = EdgeUpdate()
@@ -118,11 +120,22 @@ class DenoisingModel(nn.Module):
         self.node_embedder = node_embedder.NodeEmbedder(model_conf.node_features)
         self.edge_embedder = edge_embedder.EdgeEmbedder(model_conf.edge_features)
 
-    def forward(self, seq, coord_4d):
-        S = len(coord_4d)   # Length of Frame
-        node_emb = self.node_embedder(seq)
-        edge_emb = self.edge_embedder(seq)
-        # Time_emb = SinusoidalTimeEmbedding()
+    def forward(self, input_feat):
+        """
+        input_feat:
+            Shape coord_3d : torch.Size([B, N, 3])
+            Shape trans_sc : torch.Size([B, N, 3])
+            Shape res_mask : torch.Size([B, N])
+            Shape trans_t : torch.Size([B, N, 3])
+            Shape rotmats_t : torch.Size([B, N, 3, 3])
+            Shape t : torch.Size([B, 1])
+            Shape Backbone_trajectory : torch.size([B, N, 3, 8])
+        """
+                
+        S = len(input_feat.t[0])
+        init_node_embed = self.node_embedder(continuous_t, node_mask)
+        trans_sc = input_feat.get('trans_sc', torch.zeros_like(trans_t))
+        init_edge_embed = self.edge_embedder(init_node_embed, trans_t, trans_sc, edge_mask)
 
         V_0 = node_emb.repeat(S, 1, 1)   # (Frame, residue, residue, Node_dim) 
         Z_0 = edge_emb.repeat(S, 1, 1, 1)    # (Frame, residue, Edge_dim)
