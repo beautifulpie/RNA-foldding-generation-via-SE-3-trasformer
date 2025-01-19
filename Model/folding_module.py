@@ -16,7 +16,8 @@ import sys
 sys.path.append("/workspace/4D-Diff-RNA_test_1/")
 from Model.analysis import metrics
 from Model.analysis import utils as au
-from Model  import new_model 
+from Model import new_model
+from Model import diff_model
 from Model import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
@@ -35,7 +36,7 @@ class FlowModule(LightningModule):
         self._interpolant_cfg = cfg.interpolant
 
         # Set-up vector field prediction model
-        self.model = new_model.FlowModel(cfg.model)
+        self.model = diff_model.FlowModel(cfg.model)
 
         # Set-up interpolant
         self.interpolant = Interpolant(cfg.interpolant)
