@@ -3,45 +3,89 @@ import torch.nn as nn
 import torch
 
 class MotionAlignment(nn.Module):
-    def __init__(self, input_dim, output_dim, num_heads):
+    def __init__(self, input_dim, output_dim, num_heads, max_seq_len=100):
         super().__init__()
-        self.position_embedding = nn.Embedding(100, input_dim)  # 예를 들어, 100개의 위치 임베딩
-        self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads)
+        self.position_embedding = nn.Embedding(max_seq_len, input_dim)  # 최대 시퀀스 길이만큼 위치 임베딩
+        self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads, batch_first=True)
         self.linear = nn.Linear(input_dim, output_dim)
 
-    def forward(self, motion_nodes, reference_nodes, noisy_nodes, time_step):
-        # 위치 임베딩 가져오기
-        position_embeds = self.position_embedding(time_step)
+    def forward(self, V_s, V_mot, V_ref):
+        """
+        V_s: Noised Node (B, S, D)  # 배치, 시퀀스 길이, 특성 차원
+        V_mot: Motion Node (B, 1, D)
+        V_ref: Reference Node (B, 1, D)
+        """
+        batch_size, seq_len, dim = V_s.shape
 
-        # 노드 결합
-        combined_nodes = torch.cat([motion_nodes, reference_nodes, noisy_nodes], dim=0)
+        # 노드 결합 (V_mot, V_ref는 1개 시퀀스지만, V_s는 S개 시퀀스를 가짐)
+        combined_nodes = torch.cat([V_mot, V_ref, V_s], dim=1)  # (B, 2+S, D)
 
-        # Attention 적용
-        attn_output, _ = self.attention(combined_nodes + position_embeds, combined_nodes + position_embeds, combined_nodes + position_embeds)
+        # 위치 임베딩 추가 (시퀀스 길이에 맞게 생성)
+        position_ids = torch.arange(combined_nodes.shape[1], device=combined_nodes.device).unsqueeze(0)
+        position_embeds = self.position_embedding(position_ids)  # (1, 2+S, D)
+
+        # Attention 적용 (Q=K=V로 사용)
+        attn_output, _ = self.attention(combined_nodes + position_embeds, 
+                                        combined_nodes + position_embeds, 
+                                        combined_nodes + position_embeds)
 
         # 선형 변환
-        output = self.linear(attn_output)
+        output = self.linear(attn_output)  # (B, 2+S, output_dim)
 
-        return output
+        # Residual Connection 추가 (V_s 부분만 사용)
+        output[:, 2:, :] += V_s  # 원래의 V_s에 output 값 더하기 (Residual)
+
+        return output[:, 2:, :]  # (B, S, output_dim) -> V_s와 같은 차원으로 반환
 
 class SpatialModule(nn.Module):
-    def __init__(self, input_dim, output_dim, num_heads):
+    def __init__(self, input_dim, num_heads):
+        """
+        Reference Network using Self-Attention.
+
+        Args:
+            input_dim (int): Feature dimension (D).
+            num_heads (int): Number of heads for multi-head self-attention.
+        """
         super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads)
-        self.linear = nn.Linear(input_dim, output_dim)
+        
+        # Self-Attention Layer
+        self.self_attention = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads, batch_first=True)
+        
+        # Projection Matrix Wr (2D × D)
+        self.projection = nn.Linear(2 * input_dim, input_dim)
 
-    def forward(self, node_features, reference_nodes, noisy_nodes):
-        # 입력 노드와 기준 노드 결합
-        combined_nodes = torch.cat([node_features, reference_nodes, noisy_nodes], dim=0)
-        
-        # Attention 적용
-        attn_output, _ = self.attention(combined_nodes, combined_nodes, combined_nodes)
-        
-        # 선형 변환
-        output = self.linear(attn_output)
-        
-        return output
+        # Linear Projection Wr (D × D)
+        self.linear = nn.Linear(input_dim, input_dim)
 
+
+    def forward(self, V_ref, V_s):
+        """
+        Forward pass of Reference Network.
+
+        Args:
+            V_ref (torch.Tensor): Reference node features (S × N × D).
+            V_s (torch.Tensor): Noisy node features (S × N × D).
+
+        Returns:
+            torch.Tensor: Updated noisy node features (V̂_s^l).
+        """
+        # Step 1: Concatenate reference and noisy node features along the last dimension
+        combined_features = torch.cat([V_ref, V_s], dim=-1)  # Shape: (S, N, 2D)
+
+        # Step 2: Project to D-dimensional space for Self-Attention
+        projected_features = self.projection(combined_features)  # Shape: (S, N, D)
+
+        # Step 3: Apply Self-Attention
+        attn_output, _ = self.self_attention(projected_features, projected_features, projected_features)
+
+        # Step 4: Linear transformation
+        A_s = self.linear(attn_output)  # Shape: (S, N, D)
+
+        # Step 5: Residual connection with original noisy node features
+        V_s_hat = A_s + V_s  # Shape: (S, N, D)
+
+        return V_s_hat
+    
 class EdgeUpdate(nn.Module):
     def __init__(self, D_v, D_z):
         super(EdgeUpdate, self).__init__()

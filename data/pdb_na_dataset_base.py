@@ -318,7 +318,8 @@ class PDBNABaseDatasetMD(Dataset):
         출력 : 프로세싱 해서 텐서로 출력
         """
         trajectory = []
-        pdb_file_paths.sort()
+        inst_feats = []
+
 
         for pdb_path in pdb_file_paths:
             try:
@@ -443,7 +444,8 @@ class PDBNABaseDatasetMD(Dataset):
             final_feats = du.pad_feats(final_feats, max_length_for_residue)
             final_feats = self.convert_dict_float64_items_to_float32(final_feats)
 
-            trajectory.append(final_feats["trans_1"], final_feats["rotmats_1"])
+            trajectory.append([final_feats["trans_1"], final_feats["rotmats_1"]])
+            inst_feats.append(final_feats)
 
         combined_tensor = {
             # 'torsion_angles_sin_cos': [],
@@ -455,8 +457,8 @@ class PDBNABaseDatasetMD(Dataset):
         }
 
         time_dim = len(trajectory)
-        for key in trajectory[0].keys():
-            time_tensors = [frame[key] for frame in trajectory]
+        for key in inst_feats[0].keys():
+            time_tensors = [frame[key] for frame in inst_feats]
             
             # 모든 요소를 torch.Tensor로 변환
             # 이미 torch.Tensor인 경우에는 그대로 유지됨
@@ -491,6 +493,8 @@ class PDBNABaseDatasetMD(Dataset):
 
         if not pdb_file_paths:
             raise KeyError(f"RNA {rna} does not contain 'processed_path'.")
+        
+        pdb_file_paths.sort()
 
         combined_feats = self._process_csv_row(pdb_file_paths = tuple(pdb_file_paths), rna_name = rna)
         
@@ -510,14 +514,13 @@ class PDBNABaseDatasetMD(Dataset):
             'torsion_angles_sin_cos': torsion_angles
         }
 
-        for key, value in input_feat.items():
-            if isinstance(value, torch.Tensor):  # Tensor인 경우 shape 출력
-                print(f"{key}: {value.shape}")
-            elif isinstance(value, list) and all(isinstance(v, tuple) for v in value):  # List[Tuple]인 경우 길이 출력
-                print(f"{key}: List of {len(value)} tuples")
-            else:  # 다른 타입인 경우 타입 출력
-                print(f"{key}: {type(value)}")
-
+        # for key, value in input_feat.items():
+        #     if isinstance(value, torch.Tensor):  # Tensor인 경우 shape 출력
+        #         print(f"{key}: {value.shape}")
+        #     elif isinstance(value, list) and all(isinstance(v, tuple) for v in value):  # List[Tuple]인 경우 길이 출력
+        #         print(f"{key}: List of {len(value)} tuples")
+        #     else:  # 다른 타입인 경우 타입 출력
+        #         print(f"{key}: {type(value)}")
 
         return input_feat
 

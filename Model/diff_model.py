@@ -52,8 +52,8 @@ class FlowModel(nn.Module):
         for param in self.edge_embedder.parameters():
             param.requires_grad = False
 
-        self.spatial_module = SpatialModule(input_dim=128, output_dim=128, num_heads=4)
-        self.motion_alignment = MotionAlignment(input_dim=128, output_dim=128, num_heads=4)
+        self.spatial_module = SpatialModule(input_dim=model_conf.node_embed_size,  num_heads=4)
+        self.motion_alignment = MotionAlignment(input_dim=model_conf.node_embed_size, output_dim=128, num_heads=4)
         # self.edge_update = EdgeUpdate(D_v= 128, D_z= 64)
         # self.backbone_update = BackboneUpdate(D_v= 128)
 
@@ -131,21 +131,22 @@ class FlowModel(nn.Module):
             V_1 = self.trunk[f'ipa_{b}'](node_embed, edge_embed, curr_rigids, node_mask)
             V_1 *= node_mask[..., None]
             V_2 = V_1 + V_0
-            V_3 = torch.concat((V_2, V_0), dim = 0)
-            V_new_spaital= self.spatial_module(V_3)
-            V_4 = V_new_spaital + V_2
-            V_5 = torch.concat((V_4, V_0), dim = 0)
-            V_new_motion = self.motion_alignment(V_5)
-            V_new = V_4 + V_new_motion
+            # V_3 = torch.concat((V_2, V_0), dim = 0)
+            V_new_spaital= self.spatial_module(V_2, V_2)
+            # print(V_new_spaital.shape)
+            V_3 = V_new_spaital + V_2
+            V_4 = torch.concat((V_3, V_0), dim = 0)
+            # V_new_motion = self.motion_alignment(V_4, V_4, V_4)
+            V_new = V_3 #+ V_new_motion
 
             node_embed = V_new
             edge_embed = self.trunk[f'edge_transition_{b}'](node_embed, edge_embed)
             edge_embed *= edge_mask[..., None] 
 
-            node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + V_1)
-            seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](node_embed, src_key_padding_mask=(1 - node_mask).bool())
-            node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
-            node_embed = self.trunk[f'node_transition{b}'](node_embed)
+            # node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + V_1)
+            # seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](node_embed, src_key_padding_mask=(1 - node_mask).bool())
+            # node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
+            node_embed = self.trunk[f'node_transition_{b}'](node_embed)
             node_embed = node_embed * node_mask[..., None]
 
             rigid_update = self.trunk[f'bb_update_{b}'](node_embed * node_mask[..., None])
