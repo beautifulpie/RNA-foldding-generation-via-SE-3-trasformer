@@ -1,6 +1,6 @@
-# 4D-Diff-RNA
+# RNA-foldding-generation-via-SE-3-trasformer
 
-4D-Diff-RNA는 RNA 3차원/4차원 구조 궤적을 학습하기 위한 PyTorch Lightning 기반 확산/플로우 모델 연구 코드베이스입니다. RNA PDB 파일을 전처리해 학습 가능한 피처로 변환하고, SE(3) 기하 정보를 다루는 Invariant Point Attention(IPA) 계열 모델로 backbone frame, translation, rotation, torsion angle을 예측하는 것을 목표로 합니다.
+RNA-foldding-generation-via-SE-3-trasformer는 RNA 3차원/4차원 구조 궤적을 학습하기 위한 PyTorch Lightning 기반 확산/플로우 모델 연구 코드베이스입니다. RNA PDB 파일을 전처리해 학습 가능한 피처로 변환하고, SE(3) 기하 정보를 다루는 Invariant Point Attention(IPA) 계열 모델로 backbone frame, translation, rotation, torsion angle을 예측하는 것을 목표로 합니다.
 
 ## 주요 기능
 
